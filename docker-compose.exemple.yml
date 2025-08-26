@@ -1,0 +1,43 @@
+services:
+  # Service MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: salaunes_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: salaunes_country_dans
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - salaunes_network
+
+  # Service Backend Express
+  backend:
+    build: .
+    container_name: salaunes_backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/salaunes_country_dans?authSource=admin
+      JWT_SECRET: votre_secret_jwt_tres_securise_ici
+      JWT_EXPIRES_IN: 24h
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb
+    networks:
+      - salaunes_network
+    volumes:
+      - ./logs:/app/logs
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  salaunes_network:
+    driver: bridge
