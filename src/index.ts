@@ -14,6 +14,7 @@ import { notFound } from './middleware/notFound';
 // Routes
 import apiRoutes from './routes/api';
 import adminRoutes from './routes/admin';
+import danceRoutes from './routes/dances';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -23,7 +24,11 @@ const PORT = process.env.PORT || 3000;
 
 // Configuration CORS
 const corsOptions = {
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
+    origin: process.env.CORS_ORIGIN?.split(',') || [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:5173',
+    ],
     credentials: true,
     optionsSuccessStatus: 200,
 };
@@ -59,6 +64,7 @@ if (process.env.NODE_ENV === 'development') {
 // Routes
 app.use('/api', apiRoutes);
 app.use('/admin', adminRoutes);
+app.use('/dances', danceRoutes);
 
 // Route de santé
 app.get('/health', (req, res) => {
@@ -78,6 +84,7 @@ app.get('/', (req, res) => {
         endpoints: {
             api: '/api',
             admin: '/admin',
+            dances: '/dances',
             health: '/health',
         },
     });
@@ -98,9 +105,10 @@ const startServer = async () => {
 
         app.listen(PORT, () => {
             console.log(`🚀 Serveur démarré sur le port ${PORT}`);
-            console.log(`📊 Environnement: ${process.env.NODE_ENV}`);
+            console.log(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
             console.log(`🔗 API: http://localhost:${PORT}/api`);
-            console.log(`🔐 Admin: http://localhost:${PORT}/admin`);
+            console.log(`🔒 Admin: http://localhost:${PORT}/admin`);
+            console.log(`💃 Danses: http://localhost:${PORT}/dances`);
             console.log(`💚 Health: http://localhost:${PORT}/health`);
         });
     } catch (error) {

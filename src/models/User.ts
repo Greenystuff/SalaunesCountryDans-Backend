@@ -121,10 +121,10 @@ userSchema.pre('save', async function (next) {
 
         if (!adminExists) {
             const defaultAdmin = new this({
-                email: 'admin@salaunes-country-dans.fr',
-                password: 'Admin123!',
-                firstName: 'Admin',
-                lastName: 'Salaunes',
+                email: 'bisabell@free.fr',
+                password: 'Yesyoucan',
+                firstName: 'Isabelle',
+                lastName: 'Boutin',
                 role: 'admin',
                 isActive: true,
             });
