@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IDance extends Document {
     name: string;
-    level: 'Débutant' | 'Intermédiaire' | 'Novice';
+    level: 'Débutant' | 'Novice' | 'Intermédiaire';
     style: 'Catalan' | 'Country';
     date: string; // Date au format ISO (YYYY-MM-DD)
     dateDisplay?: string; // Date d'affichage en français (ex: "10 juin 2025")

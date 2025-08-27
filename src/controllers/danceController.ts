@@ -77,7 +77,7 @@ export const uploadPdf = async (req: MulterRequest, res: Response) => {
             .replace(/\s+/g, '-')}-${timestamp}.pdf`;
 
         // Upload vers MinIO
-        const success = await minioService.uploadFile(fileName, file.buffer, file.mimetype);
+        const success = await minioService.uploadFile('pdfs', fileName, file.buffer, file.mimetype);
 
         if (success) {
             res.json({
@@ -170,7 +170,7 @@ export const getAllDances = async (req: Request, res: Response) => {
                 if (danceObj.pdfFile) {
                     try {
                         // Utiliser l'URL publique au lieu de l'URL signée
-                        danceObj.pdfUrl = minioService.getPublicUrl(danceObj.pdfFile);
+                        danceObj.pdfUrl = minioService.getPublicUrl('pdfs', danceObj.pdfFile);
                     } catch (error) {
                         console.error(
                             `❌ Erreur lors de la génération de l'URL pour ${danceObj.pdfFile}:`,
@@ -233,7 +233,7 @@ export const getDanceById = async (req: Request, res: Response) => {
         if (dance.pdfFile) {
             try {
                 // Utiliser l'URL publique au lieu de l'URL signée
-                dance.pdfUrl = minioService.getPublicUrl(dance.pdfFile);
+                dance.pdfUrl = minioService.getPublicUrl('pdfs', dance.pdfFile);
             } catch (error) {
                 console.error(
                     `❌ Erreur lors de la génération de l'URL pour ${dance.pdfFile}:`,
@@ -325,7 +325,7 @@ export const updateDance = async (req: Request, res: Response) => {
 
             // Supprimer l'ancien fichier si il existe
             if (dance.pdfFile) {
-                await minioService.deleteFile(dance.pdfFile);
+                await minioService.deleteFile('pdfs', dance.pdfFile);
             }
 
             const pdfFileName = await minioService.downloadAndUploadPdf(
@@ -373,7 +373,7 @@ export const deleteDance = async (req: Request, res: Response) => {
 
         // Supprimer le fichier PDF associé
         if (dance.pdfFile) {
-            await minioService.deleteFile(dance.pdfFile);
+            await minioService.deleteFile('pdfs', dance.pdfFile);
         }
 
         await Dance.findByIdAndDelete(id);

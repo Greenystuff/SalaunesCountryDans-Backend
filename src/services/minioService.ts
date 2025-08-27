@@ -68,6 +68,36 @@ class MinioService {
         } catch (error) {
             console.error("❌ Erreur lors de l'initialisation du bucket MinIO:", error);
         }
+
+        // Créer le bucket gallery s'il n'existe pas
+        try {
+            const galleryBucketName = 'gallery';
+            const galleryBucketExists = await this.client.bucketExists(galleryBucketName);
+            if (!galleryBucketExists) {
+                await this.client.makeBucket(galleryBucketName, 'us-east-1');
+                console.log(`✅ Bucket '${galleryBucketName}' créé avec succès`);
+
+                // Configurer la politique publique pour le bucket gallery
+                const galleryPolicy = {
+                    Version: '2012-10-17',
+                    Statement: [
+                        {
+                            Effect: 'Allow',
+                            Principal: { AWS: ['*'] },
+                            Action: ['s3:GetObject'],
+                            Resource: [`arn:aws:s3:::${galleryBucketName}/*`],
+                        },
+                    ],
+                };
+
+                await this.client.setBucketPolicy(galleryBucketName, JSON.stringify(galleryPolicy));
+                console.log(
+                    `✅ Politique publique configurée pour le bucket '${galleryBucketName}'`
+                );
+            }
+        } catch (error) {
+            console.error("❌ Erreur lors de l'initialisation du bucket gallery:", error);
+        }
     }
 
     /**
@@ -114,13 +144,18 @@ class MinioService {
     /**
      * Upload un fichier depuis un buffer vers MinIO
      */
-    async uploadFile(fileName: string, buffer: Buffer, contentType: string): Promise<boolean> {
+    async uploadFile(
+        bucketName: string,
+        fileName: string,
+        buffer: Buffer,
+        contentType: string
+    ): Promise<boolean> {
         try {
             // Convertir le buffer en stream
             const stream = Readable.from(buffer);
 
             // Upload vers MinIO
-            await this.client.putObject(this.bucketName, fileName, stream, buffer.length, {
+            await this.client.putObject(bucketName, fileName, stream, buffer.length, {
                 'Content-Type': contentType,
                 'Content-Disposition': `inline; filename="${fileName}"`,
             });
@@ -158,10 +193,10 @@ class MinioService {
     /**
      * Génère une URL publique directe (sans signature)
      */
-    getPublicUrl(fileName: string): string {
+    getPublicUrl(bucketName: string, fileName: string): string {
         const endpoint = process.env.MINIO_EXTERNAL_ENDPOINT || 'localhost:9000';
         const protocol = process.env.MINIO_USE_SSL === 'true' ? 'https' : 'http';
-        return `${protocol}://${endpoint}/${this.bucketName}/${fileName}`;
+        return `${protocol}://${endpoint}/${bucketName}/${fileName}`;
     }
 
     /**
@@ -179,9 +214,9 @@ class MinioService {
     /**
      * Supprime un fichier de MinIO
      */
-    async deleteFile(fileName: string): Promise<boolean> {
+    async deleteFile(bucketName: string, fileName: string): Promise<boolean> {
         try {
-            await this.client.removeObject(this.bucketName, fileName);
+            await this.client.removeObject(bucketName, fileName);
             console.log(`✅ Fichier supprimé: ${fileName}`);
             return true;
         } catch (error) {

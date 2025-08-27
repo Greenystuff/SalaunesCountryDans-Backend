@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import galleryRoutes from './galleryRoutes';
 
 const router = Router();
 
@@ -72,6 +73,9 @@ router.get('/contact', (_req, res) => {
         },
     });
 });
+
+// Routes de la galerie
+router.use('/gallery', galleryRoutes);
 
 // TODO: Ajouter ici les routes pour les données du site vitrine
 // Exemples:

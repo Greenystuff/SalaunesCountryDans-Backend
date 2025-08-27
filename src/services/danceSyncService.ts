@@ -107,7 +107,7 @@ class DanceSyncService {
                     // Créer une nouvelle danse
                     const newDance = new Dance({
                         name: danceData.name,
-                        level: danceData.level as 'Débutant' | 'Intermédiaire' | 'Novice',
+                        level: danceData.level as 'Débutant' | 'Novice' | 'Intermédiaire',
                         style: danceData.style as 'Catalan' | 'Country',
                         date: this.parseFrenchDate(danceData.date), // Date ISO pour le tri
                         dateDisplay: danceData.date, // Date française pour l'affichage

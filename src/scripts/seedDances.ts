@@ -76,7 +76,7 @@ class DanceSeeder {
                 // Préparer les données de la danse
                 const danceDoc: any = {
                     name: danceData.name,
-                    level: danceData.level as 'Débutant' | 'Intermédiaire' | 'Novice',
+                    level: danceData.level as 'Débutant' | 'Novice' | 'Intermédiaire',
                     style: danceData.style as 'Catalan' | 'Country',
                     date: danceData.date,
                     youtubeLink1: danceData.youtubeLink1,

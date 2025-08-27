@@ -15,6 +15,7 @@ import { notFound } from './middleware/notFound';
 import apiRoutes from './routes/api';
 import adminRoutes from './routes/admin';
 import danceRoutes from './routes/dances';
+import galleryRoutes from './routes/galleryRoutes';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -65,6 +66,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api', apiRoutes);
 app.use('/admin', adminRoutes);
 app.use('/dances', danceRoutes);
+app.use('/gallery', galleryRoutes);
 
 // Route de santé
 app.get('/health', (req, res) => {
@@ -85,6 +87,7 @@ app.get('/', (req, res) => {
             api: '/api',
             admin: '/admin',
             dances: '/dances',
+            gallery: '/gallery',
             health: '/health',
         },
     });
@@ -109,6 +112,7 @@ const startServer = async () => {
             console.log(`🔗 API: http://localhost:${PORT}/api`);
             console.log(`🔒 Admin: http://localhost:${PORT}/admin`);
             console.log(`💃 Danses: http://localhost:${PORT}/dances`);
+            console.log(`🖼️ Galerie: http://localhost:${PORT}/gallery`);
             console.log(`💚 Health: http://localhost:${PORT}/health`);
         });
     } catch (error) {
