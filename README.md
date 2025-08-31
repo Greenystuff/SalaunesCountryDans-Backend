@@ -49,7 +49,7 @@ PORT=3000
 MONGODB_URI=mongodb://admin:password123@localhost:27017/salaunes_country_dans?authSource=admin
 JWT_SECRET=votre_secret_jwt_tres_securise_ici
 JWT_EXPIRES_IN=24h
-CORS_ORIGIN=http://localhost:3000,http://localhost:8080
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
 ```
 
 ## 🐳 Démarrage avec Docker
