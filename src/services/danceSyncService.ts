@@ -108,7 +108,6 @@ class DanceSyncService {
                     const newDance = new Dance({
                         name: danceData.name,
                         level: danceData.level as 'Débutant' | 'Novice' | 'Intermédiaire',
-                        style: danceData.style as 'Catalan' | 'Country',
                         date: this.parseFrenchDate(danceData.date), // Date ISO pour le tri
                         dateDisplay: danceData.date, // Date française pour l'affichage
                         youtubeLink1: danceData.youtubeLink1 || '',

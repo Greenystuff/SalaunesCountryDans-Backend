@@ -3,7 +3,6 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IDance extends Document {
     name: string;
     level: 'Débutant' | 'Novice' | 'Intermédiaire';
-    style: 'Catalan' | 'Country';
     date: string; // Date au format ISO (YYYY-MM-DD)
     dateDisplay?: string; // Date d'affichage en français (ex: "10 juin 2025")
     youtubeLink1: string;
@@ -25,12 +24,6 @@ const DanceSchema = new Schema<IDance>(
         level: {
             type: String,
             enum: ['Débutant', 'Intermédiaire', 'Novice'],
-            required: true,
-            index: true,
-        },
-        style: {
-            type: String,
-            enum: ['Catalan', 'Country'],
             required: true,
             index: true,
         },
@@ -85,13 +78,12 @@ DanceSchema.pre('save', function (next) {
 });
 
 // Index composés pour les recherches fréquentes
-DanceSchema.index({ level: 1, style: 1 });
-DanceSchema.index({ style: 1, level: 1 });
+DanceSchema.index({ level: 1 });
 DanceSchema.index({ name: 'text' }); // Index de texte pour la recherche
 
 // Méthodes statiques
-DanceSchema.statics.findByLevelAndStyle = function (level: string, style: string) {
-    return this.find({ level, style }).sort({ date: -1 });
+DanceSchema.statics.findByLevel = function (level: string) {
+    return this.find({ level }).sort({ date: -1 });
 };
 
 DanceSchema.statics.searchByName = function (searchTerm: string) {

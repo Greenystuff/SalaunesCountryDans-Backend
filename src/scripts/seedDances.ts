@@ -77,7 +77,6 @@ class DanceSeeder {
                 const danceDoc: any = {
                     name: danceData.name,
                     level: danceData.level as 'Débutant' | 'Novice' | 'Intermédiaire',
-                    style: danceData.style as 'Catalan' | 'Country',
                     date: danceData.date,
                     youtubeLink1: danceData.youtubeLink1,
                     youtubeLink2: danceData.youtubeLink2,
@@ -138,22 +137,12 @@ class DanceSeeder {
             { $sort: { count: -1 } },
         ]);
 
-        const styleStats = await Dance.aggregate([
-            { $group: { _id: '$style', count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-        ]);
-
         console.log(`   Total danses: ${totalDances}`);
         console.log(`   Avec PDF: ${dancesWithPdf}`);
         console.log(`   Avec YouTube: ${dancesWithYoutube}`);
 
         console.log('\n   Niveaux:');
         levelStats.forEach((stat) => {
-            console.log(`     ${stat._id}: ${stat.count}`);
-        });
-
-        console.log('\n   Styles:');
-        styleStats.forEach((stat) => {
             console.log(`     ${stat._id}: ${stat.count}`);
         });
     }

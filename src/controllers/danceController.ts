@@ -105,21 +105,12 @@ export const uploadMiddleware = upload.single('pdf');
 
 export const getAllDances = async (req: Request, res: Response) => {
     try {
-        const {
-            page,
-            limit,
-            level,
-            style,
-            search,
-            sortBy = 'date',
-            sortOrder = 'desc',
-        } = req.query;
+        const { page, limit, level, search, sortBy = 'date', sortOrder = 'desc' } = req.query;
 
         // Construire le filtre
         const filter: any = {};
 
         if (level) filter.level = level;
-        if (style) filter.style = style;
         if (search) {
             filter.name = { $regex: search as string, $options: 'i' };
         }
