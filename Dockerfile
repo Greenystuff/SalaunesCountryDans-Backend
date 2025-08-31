@@ -14,7 +14,7 @@ RUN npm ci
 COPY . .
 
 # Compiler TypeScript
-RUN npm run build:dev
+RUN npm run build
 
 # Copier le fichier JSON dans le dossier dist
 RUN cp src/scripts/all_dances.json dist/scripts/ || true
