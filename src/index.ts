@@ -63,7 +63,6 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Routes
-app.use('/api', apiRoutes);
 app.use('/admin', adminRoutes);
 app.use('/dances', danceRoutes);
 app.use('/gallery', galleryRoutes);
@@ -84,7 +83,6 @@ app.get('/', (req, res) => {
         message: "Bienvenue sur l'API Salaunes Country Dans",
         version: '1.0.0',
         endpoints: {
-            api: '/api',
             admin: '/admin',
             dances: '/dances',
             gallery: '/gallery',
@@ -109,7 +107,6 @@ const startServer = async () => {
         app.listen(PORT, () => {
             console.log(`🚀 Serveur démarré sur le port ${PORT}`);
             console.log(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
-            console.log(`🔗 API: http://localhost:${PORT}/api`);
             console.log(`🔒 Admin: http://localhost:${PORT}/admin`);
             console.log(`💃 Danses: http://localhost:${PORT}/dances`);
             console.log(`🖼️ Galerie: http://localhost:${PORT}/gallery`);
