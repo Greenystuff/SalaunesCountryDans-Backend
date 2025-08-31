@@ -31,7 +31,7 @@ jobs:
               run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.ref_name }} .
 
             - name: Tag Docker Image
-              run: docker tag ${{ env.IMAGE_NAME }}:${{ github.ref_name }} hub.rahona.app:8443/salaunes-contry-club/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+              run: docker tag ${{ env.IMAGE_NAME }}:${{ github.ref_name }} hub.rahona.app:8443/salaunes-country-club/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
 
             - name: Push Docker Image
-              run: docker push hub.rahona.app:8443/salaunes-contry-club/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+              run: docker push hub.rahona.app:8443/salaunes-country-club/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
