@@ -18,6 +18,7 @@ import galleryRoutes from './routes/gallery';
 import coursesRoutes from './routes/courses';
 import membersRoutes from './routes/members';
 import publicMembersRoutes from './routes/publicMembers';
+import dashboardRoutes from './routes/dashboard';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -71,6 +72,7 @@ app.use('/gallery', galleryRoutes);
 app.use('/courses', coursesRoutes);
 app.use('/members', membersRoutes);
 app.use('/public/members', publicMembersRoutes);
+app.use('/dashboard', dashboardRoutes);
 
 // Route de santé
 app.get('/health', (req, res) => {
