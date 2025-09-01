@@ -12,10 +12,10 @@ import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
 
 // Routes
-import apiRoutes from './routes/api';
-import adminRoutes from './routes/admin';
+import authRoutes from './routes/auth';
 import danceRoutes from './routes/dances';
-import galleryRoutes from './routes/galleryRoutes';
+import galleryRoutes from './routes/gallery';
+import coursesRoutes from './routes/courses';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -63,9 +63,10 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Routes
-app.use('/admin', adminRoutes);
+app.use('/admin', authRoutes);
 app.use('/dances', danceRoutes);
 app.use('/gallery', galleryRoutes);
+app.use('/courses', coursesRoutes);
 
 // Route de santé
 app.get('/health', (req, res) => {
@@ -83,9 +84,9 @@ app.get('/', (req, res) => {
         message: "Bienvenue sur l'API Salaunes Country Dans",
         version: '1.0.0',
         endpoints: {
-            admin: '/admin',
             dances: '/dances',
             gallery: '/gallery',
+            courses: '/courses',
             health: '/health',
         },
     });
