@@ -6,19 +6,68 @@ import { Course } from '../models/Course';
 // Récupérer tous les membres
 export const getAllMembers = async (req: Request, res: Response) => {
     try {
-        const { page = 1, limit = 20, sortBy = 'lastName', sortOrder = 'asc' } = req.query;
+        const {
+            page = 1,
+            limit = 20,
+            sortBy = 'lastName',
+            sortOrder = 'asc',
+            q,
+            city,
+            imageRights,
+            status,
+        } = req.query;
+
+        console.log('Paramètres reçus:', {
+            page,
+            limit,
+            sortBy,
+            sortOrder,
+            q,
+            city,
+            imageRights,
+            status,
+        });
 
         const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
         const sort: any = {};
         sort[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
 
-        const members = await Member.find()
+        // Construire la requête avec les filtres
+        let query: any = {};
+
+        // Recherche par nom/prénom/email
+        if (q) {
+            query.$or = [
+                { firstName: { $regex: q, $options: 'i' } },
+                { lastName: { $regex: q, $options: 'i' } },
+                { email: { $regex: q, $options: 'i' } },
+            ];
+        }
+
+        // Filtre par ville
+        if (city) {
+            query.city = { $regex: city, $options: 'i' };
+        }
+
+        // Filtre par droit à l'image
+        if (imageRights !== undefined && imageRights !== '') {
+            query.imageRights = imageRights === 'true';
+        }
+
+        // Filtre par statut
+        if (status) {
+            query.status = status;
+        }
+
+        console.log('Requête MongoDB construite:', JSON.stringify(query, null, 2));
+
+        const members = await Member.find(query)
             .populate('enrolledCourses', 'title level start')
             .sort(sort)
             .skip(skip)
             .limit(parseInt(limit as string));
 
-        const total = await Member.countDocuments();
+        const total = await Member.countDocuments(query);
 
         res.json({
             success: true,
