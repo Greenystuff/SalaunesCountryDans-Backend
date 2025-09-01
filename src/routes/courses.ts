@@ -1,4 +1,5 @@
 import express from 'express';
+import { authenticateToken } from '../middleware/auth';
 import {
     getAllCourses,
     getUpcomingCourses,
@@ -9,22 +10,25 @@ import {
     deleteCourse,
     searchCourses,
     getCourseStats,
+    getRecurringCourses,
 } from '../controllers/courseController';
-import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
-// Routes publiques (pour le frontend)
+// Routes publiques
 router.get('/', getAllCourses);
 router.get('/upcoming', getUpcomingCourses);
 router.get('/date/:date', getCoursesByDate);
 router.get('/search', searchCourses);
 router.get('/stats', getCourseStats);
+router.get('/recurring', getRecurringCourses);
 
-// Routes protégées (admin uniquement)
-router.get('/:id', authenticateToken, getCourseById);
-router.post('/', authenticateToken, createCourse);
-router.put('/:id', authenticateToken, updateCourse);
-router.delete('/:id', authenticateToken, deleteCourse);
+// Routes protégées (nécessitent une authentification)
+router.use(authenticateToken);
+
+router.get('/:id', getCourseById);
+router.post('/', createCourse);
+router.put('/:id', updateCourse);
+router.delete('/:id', deleteCourse);
 
 export default router;

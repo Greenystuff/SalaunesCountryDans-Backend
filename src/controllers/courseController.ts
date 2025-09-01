@@ -5,6 +5,7 @@ import { Course, ICourse } from '../models/Course';
 export const getAllCourses = async (req: Request, res: Response) => {
     try {
         const courses = await Course.find().sort({ start: 1 });
+
         res.json({
             success: true,
             data: courses,
@@ -111,6 +112,18 @@ export const createCourse = async (req: Request, res: Response) => {
             });
         }
 
+        // Validation de la date de fin de récurrence si fournie
+        if (courseData.recurrenceEndDate) {
+            const recurrenceEndDate = new Date(courseData.recurrenceEndDate);
+            if (isNaN(recurrenceEndDate.getTime()) || recurrenceEndDate <= start) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        'La date de fin de récurrence doit être postérieure à la date de début',
+                });
+            }
+        }
+
         const course = new Course({
             ...courseData,
             start,
@@ -122,7 +135,10 @@ export const createCourse = async (req: Request, res: Response) => {
         res.status(201).json({
             success: true,
             data: course,
-            message: 'Cours créé avec succès',
+            message:
+                course.recurrence !== 'Aucune'
+                    ? 'Cours récurrent créé avec succès et occurrences générées'
+                    : 'Cours créé avec succès',
         });
     } catch (error: any) {
         console.error('❌ Erreur lors de la création du cours:', error);
@@ -175,6 +191,20 @@ export const updateCourse = async (req: Request, res: Response) => {
             }
         }
 
+        // Validation de la date de fin de récurrence si fournie
+        if (updateData.recurrenceEndDate) {
+            const recurrenceEndDate = new Date(updateData.recurrenceEndDate);
+            const start = updateData.start ? new Date(updateData.start) : undefined;
+
+            if (isNaN(recurrenceEndDate.getTime()) || (start && recurrenceEndDate <= start)) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        'La date de fin de récurrence doit être postérieure à la date de début',
+                });
+            }
+        }
+
         const course = await Course.findByIdAndUpdate(id, updateData, {
             new: true,
             runValidators: true,
@@ -190,7 +220,10 @@ export const updateCourse = async (req: Request, res: Response) => {
         res.json({
             success: true,
             data: course,
-            message: 'Cours mis à jour avec succès',
+            message:
+                course.recurrence !== 'Aucune'
+                    ? 'Cours récurrent mis à jour avec succès et occurrences régénérées'
+                    : 'Cours mis à jour avec succès',
         });
     } catch (error: any) {
         console.error('❌ Erreur lors de la mise à jour du cours:', error);
@@ -214,8 +247,9 @@ export const updateCourse = async (req: Request, res: Response) => {
 export const deleteCourse = async (req: Request, res: Response) => {
     try {
         const course = await Course.findByIdAndDelete(req.params.id);
+        const success = !!course;
 
-        if (!course) {
+        if (!success) {
             return res.status(404).json({
                 success: false,
                 message: 'Cours non trouvé',
@@ -315,6 +349,19 @@ export const getCourseStats = async (req: Request, res: Response) => {
             end: { $gte: new Date() },
         });
 
+        // Statistiques des cours récurrents
+        const recurringStats = await Course.aggregate([
+            {
+                $match: { recurrence: { $ne: 'Aucune' } },
+            },
+            {
+                $group: {
+                    _id: '$recurrence',
+                    count: { $sum: 1 },
+                },
+            },
+        ]);
+
         res.json({
             success: true,
             data: {
@@ -322,6 +369,7 @@ export const getCourseStats = async (req: Request, res: Response) => {
                 upcoming: upcomingCount,
                 byLevel: levelStats,
                 byTeacher: teacherStats,
+                recurring: recurringStats,
             },
         });
     } catch (error) {
@@ -329,6 +377,26 @@ export const getCourseStats = async (req: Request, res: Response) => {
         res.status(500).json({
             success: false,
             message: 'Erreur lors de la récupération des statistiques',
+        });
+    }
+};
+
+// Récupérer les cours récurrents
+export const getRecurringCourses = async (req: Request, res: Response) => {
+    try {
+        const courses = await Course.find({
+            recurrence: { $ne: 'Aucune' },
+        }).sort({ start: 1 });
+
+        res.json({
+            success: true,
+            data: courses,
+        });
+    } catch (error) {
+        console.error('❌ Erreur lors de la récupération des cours récurrents:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la récupération des cours récurrents',
         });
     }
 };

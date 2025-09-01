@@ -93,7 +93,7 @@ interface ICourseModel extends mongoose.Model<ICourse> {
     findUpcoming(limit?: number): Promise<ICourse[]>;
 }
 
-// Méthode statique pour récupérer les cours d'une date
+// Méthode statique pour récupérer les cours d'une date spécifique
 courseSchema.statics.findByDate = function (date: Date) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -116,4 +116,4 @@ courseSchema.statics.findUpcoming = function (limit = 20) {
         .limit(limit);
 };
 
-export const Course = mongoose.model<ICourse, ICourseModel>('Course', courseSchema);
+export const Course = mongoose.model<ICourse, ICourseModel>('Course', courseSchema) as ICourseModel;
