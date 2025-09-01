@@ -16,6 +16,8 @@ import authRoutes from './routes/auth';
 import danceRoutes from './routes/dances';
 import galleryRoutes from './routes/gallery';
 import coursesRoutes from './routes/courses';
+import membersRoutes from './routes/members';
+import publicMembersRoutes from './routes/publicMembers';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -67,6 +69,8 @@ app.use('/admin', authRoutes);
 app.use('/dances', danceRoutes);
 app.use('/gallery', galleryRoutes);
 app.use('/courses', coursesRoutes);
+app.use('/members', membersRoutes);
+app.use('/public/members', publicMembersRoutes);
 
 // Route de santé
 app.get('/health', (req, res) => {
@@ -87,6 +91,7 @@ app.get('/', (req, res) => {
             dances: '/dances',
             gallery: '/gallery',
             courses: '/courses',
+            members: '/members',
             health: '/health',
         },
     });
@@ -111,6 +116,7 @@ const startServer = async () => {
             console.log(`🔒 Admin: http://localhost:${PORT}/admin`);
             console.log(`💃 Danses: http://localhost:${PORT}/dances`);
             console.log(`🖼️ Galerie: http://localhost:${PORT}/gallery`);
+            console.log(`👥 Membres: http://localhost:${PORT}/members`);
             console.log(`💚 Health: http://localhost:${PORT}/health`);
         });
     } catch (error) {

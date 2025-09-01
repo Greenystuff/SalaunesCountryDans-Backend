@@ -84,6 +84,7 @@ courseSchema.index({ location: 1 });
 
 // Méthode virtuelle pour calculer la durée
 courseSchema.virtual('duration').get(function (this: ICourse) {
+    if (!this.end || !this.start) return null;
     return Math.round((this.end.getTime() - this.start.getTime()) / (1000 * 60));
 });
 
