@@ -4,11 +4,71 @@ import { Course, ICourse } from '../models/Course';
 // Récupérer tous les cours
 export const getAllCourses = async (req: Request, res: Response) => {
     try {
-        const courses = await Course.find().sort({ start: 1 });
+        const {
+            page = 1,
+            limit = 20,
+            sortBy = 'start',
+            sortOrder = 'asc',
+            q,
+            level,
+            teacher,
+        } = req.query;
+
+        console.log('Paramètres reçus pour les cours:', {
+            page,
+            limit,
+            sortBy,
+            sortOrder,
+            q,
+            level,
+            teacher,
+        });
+
+        const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+        const sort: any = {};
+        sort[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
+
+        // Construire la requête avec les filtres
+        let query: any = {};
+
+        // Recherche par titre, description, teacher, location
+        if (q) {
+            query.$or = [
+                { title: { $regex: q, $options: 'i' } },
+                { description: { $regex: q, $options: 'i' } },
+                { teacher: { $regex: q, $options: 'i' } },
+                { location: { $regex: q, $options: 'i' } },
+            ];
+        }
+
+        // Filtre par niveau
+        if (level) {
+            query.level = level;
+        }
+
+        // Filtre par animateur
+        if (teacher) {
+            query.teacher = { $regex: teacher, $options: 'i' };
+        }
+
+        console.log('Requête MongoDB construite pour les cours:', JSON.stringify(query, null, 2));
+
+        const courses = await Course.find(query)
+            .sort(sort)
+            .skip(skip)
+            .limit(parseInt(limit as string));
+
+        const total = await Course.countDocuments(query);
 
         res.json({
             success: true,
             data: courses,
+            pagination: {
+                page: parseInt(page as string),
+                limit: parseInt(limit as string),
+                total,
+                pages: Math.ceil(total / parseInt(limit as string)),
+            },
         });
     } catch (error) {
         console.error('❌ Erreur lors de la récupération des cours:', error);

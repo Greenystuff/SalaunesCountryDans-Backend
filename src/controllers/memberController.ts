@@ -62,7 +62,7 @@ export const getAllMembers = async (req: Request, res: Response) => {
         console.log('Requête MongoDB construite:', JSON.stringify(query, null, 2));
 
         const members = await Member.find(query)
-            .populate('enrolledCourses', 'title level start')
+            .populate('enrolledCourses', 'title level start end teacher location')
             .sort(sort)
             .skip(skip)
             .limit(parseInt(limit as string));

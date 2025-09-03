@@ -104,13 +104,67 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             { $sort: { '_id.year': 1, '_id.month': 1 } },
         ]);
 
-        // Prochains cours (limités à 5)
-        const nextCourses = await Course.find({
-            start: { $gte: now },
-        })
-            .sort({ start: 1 })
-            .limit(5)
-            .select('title level start end teacher location');
+        // Prochains cours (limités à 5) - avec gestion de la récurrence
+        const allCourses = await Course.find({}).select(
+            'title level start end teacher location recurrence'
+        );
+        const nextCourses = [];
+
+        for (const course of allCourses) {
+            if (course.recurrence === 'Aucune') {
+                // Cours ponctuel : l'ajouter s'il est à venir
+                if (new Date(course.end) >= now) {
+                    nextCourses.push({
+                        title: course.title,
+                        level: course.level,
+                        start: course.start,
+                        end: course.end,
+                        teacher: course.teacher,
+                        location: course.location,
+                    });
+                }
+            } else {
+                // Cours récurrent : calculer la prochaine occurrence
+                const courseStart = new Date(course.start);
+                const courseEnd = new Date(course.end);
+                const duration = courseEnd.getTime() - courseStart.getTime();
+
+                // Calculer la prochaine occurrence
+                let nextOccurrence = new Date(courseStart);
+                const today = new Date();
+
+                // Trouver la prochaine occurrence à partir d'aujourd'hui
+                while (nextOccurrence < today) {
+                    switch (course.recurrence) {
+                        case 'Hebdomadaire':
+                            nextOccurrence.setDate(nextOccurrence.getDate() + 7);
+                            break;
+                        case 'Toutes les 2 semaines':
+                            nextOccurrence.setDate(nextOccurrence.getDate() + 14);
+                            break;
+                        case 'Mensuelle':
+                            nextOccurrence.setMonth(nextOccurrence.getMonth() + 1);
+                            break;
+                    }
+                }
+
+                // Si la prochaine occurrence est dans le futur, ajouter le cours
+                if (nextOccurrence >= today) {
+                    nextCourses.push({
+                        title: course.title,
+                        level: course.level,
+                        start: nextOccurrence,
+                        end: new Date(nextOccurrence.getTime() + duration),
+                        teacher: course.teacher,
+                        location: course.location,
+                    });
+                }
+            }
+        }
+
+        // Trier par date de début et limiter à 5
+        nextCourses.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        const limitedNextCourses = nextCourses.slice(0, 5);
 
         // Derniers membres inscrits (limités à 5)
         const recentMembers = await Member.find()
@@ -193,14 +247,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 
                 // Données récentes
                 recent: {
-                    nextCourses: nextCourses.map((course) => ({
-                        title: course.title,
-                        level: course.level,
-                        start: course.start,
-                        end: course.end,
-                        teacher: course.teacher,
-                        location: course.location,
-                    })),
+                    nextCourses: limitedNextCourses,
                     recentMembers: recentMembers.map((member) => ({
                         name: `${member.firstName} ${member.lastName}`,
                         status: member.status,
