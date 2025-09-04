@@ -11,6 +11,7 @@ import { initializeDatabase } from './config/init';
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
 import websocketService from './services/websocketService';
+import { PdfCacheService } from './services/pdfCacheService';
 
 // Routes
 import authRoutes from './routes/auth';
@@ -22,6 +23,7 @@ import publicMembersRoutes from './routes/publicMembers';
 import dashboardRoutes from './routes/dashboard';
 import notificationsRoutes from './routes/notifications';
 import internalRulesRoutes from './routes/internalRules';
+import pdfRoutes from './routes/pdfRoutes';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -82,6 +84,7 @@ app.use('/members', membersRoutes);
 app.use('/public/members', publicMembersRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/internal-rules', internalRulesRoutes);
+app.use('/generate-pdf', pdfRoutes);
 
 // Route de santé
 app.get('/health', (req, res) => {
@@ -122,6 +125,11 @@ const startServer = async () => {
         // Initialisation de la base de données
         await initializeDatabase();
 
+        // Initialisation du cache PDF
+        console.log('📄 Initialisation du cache PDF...');
+        const pdfCache = PdfCacheService.getInstance();
+        await pdfCache.generateInscriptionFormPdf();
+
         server.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Serveur HTTP démarré sur 0.0.0.0:${PORT}`);
             console.log(`⚡ WebSocket service initialisé avec express-ws`);
@@ -131,6 +139,9 @@ const startServer = async () => {
             console.log(`🖼️ Galerie: http://localhost:${PORT}/gallery`);
             console.log(`👥 Membres: http://localhost:${PORT}/members`);
             console.log(`📋 Règlement: http://localhost:${PORT}/internal-rules`);
+            console.log(
+                `📄 PDF Inscription: http://localhost:${PORT}/generate-pdf/inscription-form`
+            );
             console.log(`💚 Health: http://localhost:${PORT}/health`);
             console.log(`🔌 WebSocket: ws://localhost:${PORT}/ws`);
             console.log(`🐳 Accessible depuis l'hôte sur toutes les interfaces`);

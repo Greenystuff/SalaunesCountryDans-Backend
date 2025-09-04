@@ -1,6 +1,21 @@
 # Utiliser l'image Node.js officielle avec Alpine Linux pour une taille réduite
 FROM node:20-alpine
 
+# Installer les dépendances pour html-pdf-node
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    freetype-dev \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    && rm -rf /var/cache/apk/*
+
+# Variables d'environnement pour html-pdf-node
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 # Définir le répertoire de travail
 WORKDIR /app
 
