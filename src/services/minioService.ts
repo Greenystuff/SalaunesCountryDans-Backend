@@ -98,6 +98,39 @@ class MinioService {
         } catch (error) {
             console.error("❌ Erreur lors de l'initialisation du bucket gallery:", error);
         }
+
+        // Créer le bucket documents s'il n'existe pas
+        try {
+            const documentsBucketName = 'documents';
+            const documentsBucketExists = await this.client.bucketExists(documentsBucketName);
+            if (!documentsBucketExists) {
+                await this.client.makeBucket(documentsBucketName, 'us-east-1');
+                console.log(`✅ Bucket '${documentsBucketName}' créé avec succès`);
+
+                // Configurer la politique publique pour le bucket documents
+                const documentsPolicy = {
+                    Version: '2012-10-17',
+                    Statement: [
+                        {
+                            Effect: 'Allow',
+                            Principal: { AWS: ['*'] },
+                            Action: ['s3:GetObject'],
+                            Resource: [`arn:aws:s3:::${documentsBucketName}/*`],
+                        },
+                    ],
+                };
+
+                await this.client.setBucketPolicy(
+                    documentsBucketName,
+                    JSON.stringify(documentsPolicy)
+                );
+                console.log(
+                    `✅ Politique publique configurée pour le bucket '${documentsBucketName}'`
+                );
+            }
+        } catch (error) {
+            console.error("❌ Erreur lors de l'initialisation du bucket documents:", error);
+        }
     }
 
     /**

@@ -21,6 +21,7 @@ import membersRoutes from './routes/members';
 import publicMembersRoutes from './routes/publicMembers';
 import dashboardRoutes from './routes/dashboard';
 import notificationsRoutes from './routes/notifications';
+import internalRulesRoutes from './routes/internalRules';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -80,6 +81,7 @@ app.use('/courses', coursesRoutes);
 app.use('/members', membersRoutes);
 app.use('/public/members', publicMembersRoutes);
 app.use('/dashboard', dashboardRoutes);
+app.use('/internal-rules', internalRulesRoutes);
 
 // Route de santé
 app.get('/health', (req, res) => {
@@ -101,6 +103,7 @@ app.get('/', (req, res) => {
             gallery: '/gallery',
             courses: '/courses',
             members: '/members',
+            internalRules: '/internal-rules',
             health: '/health',
         },
     });
@@ -127,6 +130,7 @@ const startServer = async () => {
             console.log(`💃 Danses: http://localhost:${PORT}/dances`);
             console.log(`🖼️ Galerie: http://localhost:${PORT}/gallery`);
             console.log(`👥 Membres: http://localhost:${PORT}/members`);
+            console.log(`📋 Règlement: http://localhost:${PORT}/internal-rules`);
             console.log(`💚 Health: http://localhost:${PORT}/health`);
             console.log(`🔌 WebSocket: ws://localhost:${PORT}/ws`);
             console.log(`🐳 Accessible depuis l'hôte sur toutes les interfaces`);
