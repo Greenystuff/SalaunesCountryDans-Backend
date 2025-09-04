@@ -27,6 +27,9 @@ export class PdfController {
                     'attachment; filename="formulaire-inscription-salaunes-country-dans.pdf"'
                 );
                 res.setHeader('Content-Length', retryBuffer.length);
+                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); // Pas de cache
+                res.setHeader('Pragma', 'no-cache');
+                res.setHeader('Expires', '0');
                 res.send(retryBuffer);
                 return;
             }
@@ -38,7 +41,9 @@ export class PdfController {
                 'attachment; filename="formulaire-inscription-salaunes-country-dans.pdf"'
             );
             res.setHeader('Content-Length', pdfBuffer.length);
-            res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache 1h côté client
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); // Pas de cache
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
 
             res.send(pdfBuffer);
         } catch (error) {
