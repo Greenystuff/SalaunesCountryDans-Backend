@@ -2,6 +2,10 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { JWTPayload } from '../middleware/auth';
+import minioService from '../services/minioService';
+import websocketService from '../services/websocketService';
+import multer from 'multer';
+import { v4 as uuidv4 } from 'uuid';
 
 // Générer un token JWT
 const generateToken = (userId: string, email: string, role: string): string => {
@@ -132,7 +136,10 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
                     email: user.email,
                     firstName: user.firstName,
                     lastName: user.lastName,
+                    phone: user.phone,
+                    avatar: user.avatar,
                     role: user.role,
+                    isActive: user.isActive,
                     lastLogin: user.lastLogin,
                     createdAt: user.createdAt,
                     updatedAt: user.updatedAt,
@@ -232,6 +239,294 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
         });
     } catch (error) {
         console.error('Erreur lors du changement de mot de passe:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur interne du serveur',
+        });
+    }
+};
+
+// Mettre à jour le profil utilisateur
+export const updateProfile = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { firstName, lastName, email, phone } = req.body;
+
+        // Validation des champs requis
+        if (!firstName || !lastName || !email) {
+            res.status(400).json({
+                success: false,
+                message: 'Prénom, nom et email sont requis',
+            });
+            return;
+        }
+
+        // Vérifier si l'email est déjà utilisé par un autre utilisateur
+        const existingUser = await User.findOne({
+            email,
+            _id: { $ne: req.user._id },
+        });
+
+        if (existingUser) {
+            res.status(400).json({
+                success: false,
+                message: 'Cet email est déjà utilisé',
+            });
+            return;
+        }
+
+        // Mettre à jour l'utilisateur
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                firstName: firstName.trim(),
+                lastName: lastName.trim(),
+                email: email.toLowerCase().trim(),
+                phone: phone?.trim() || undefined,
+            },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedUser) {
+            res.status(404).json({
+                success: false,
+                message: 'Utilisateur non trouvé',
+            });
+            return;
+        }
+
+        // Notification WebSocket de mise à jour du profil
+        websocketService.notifyProfileUpdate(updatedUser._id.toString(), {
+            id: updatedUser._id,
+            email: updatedUser.email,
+            firstName: updatedUser.firstName,
+            lastName: updatedUser.lastName,
+            phone: updatedUser.phone,
+            avatar: updatedUser.avatar,
+            role: updatedUser.role,
+            isActive: updatedUser.isActive,
+            lastLogin: updatedUser.lastLogin,
+            createdAt: updatedUser.createdAt,
+            updatedAt: updatedUser.updatedAt,
+        });
+
+        // Notification aux admins de la mise à jour
+        websocketService.notifyAdmins(
+            'info',
+            `Profil mis à jour: ${updatedUser.firstName} ${updatedUser.lastName}`
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Profil mis à jour avec succès',
+            data: {
+                user: {
+                    id: updatedUser._id,
+                    email: updatedUser.email,
+                    firstName: updatedUser.firstName,
+                    lastName: updatedUser.lastName,
+                    phone: updatedUser.phone,
+                    avatar: updatedUser.avatar,
+                    role: updatedUser.role,
+                    isActive: updatedUser.isActive,
+                    lastLogin: updatedUser.lastLogin,
+                    createdAt: updatedUser.createdAt,
+                    updatedAt: updatedUser.updatedAt,
+                },
+            },
+        });
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour du profil:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur interne du serveur',
+        });
+    }
+};
+
+// Configuration multer pour l'upload d'avatar
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB max
+    },
+    fileFilter: (req, file, cb) => {
+        // Vérifier que c'est bien une image
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Seuls les fichiers image sont autorisés'));
+        }
+    },
+});
+
+// Middleware pour l'upload d'avatar
+export const uploadAvatarMiddleware = upload.single('avatar');
+
+// Upload d'avatar
+export const uploadAvatar = async (req: Request, res: Response): Promise<void> => {
+    try {
+        if (!req.file) {
+            res.status(400).json({
+                success: false,
+                message: 'Aucun fichier fourni',
+            });
+            return;
+        }
+
+        // Générer un nom de fichier unique
+        const fileExtension = req.file.originalname.split('.').pop();
+        const fileName = `avatars/${req.user._id}-${uuidv4()}.${fileExtension}`;
+
+        // Upload vers MinIO
+        const bucketName = 'gallery'; // Utiliser le bucket gallery existant
+        const uploadSuccess = await minioService.uploadFile(
+            bucketName,
+            fileName,
+            req.file.buffer,
+            req.file.mimetype
+        );
+
+        if (!uploadSuccess) {
+            res.status(500).json({
+                success: false,
+                message: "Erreur lors de l'upload du fichier",
+            });
+            return;
+        }
+
+        // Supprimer l'ancien avatar s'il existe
+        const user = await User.findById(req.user._id);
+        if (user?.avatar) {
+            // Extraire le nom de fichier de l'URL de l'ancien avatar
+            const oldFileName = user.avatar.split('/').slice(-2).join('/');
+            await minioService.deleteFile(bucketName, oldFileName);
+        }
+
+        // Générer l'URL publique
+        const avatarUrl = minioService.getPublicUrl(bucketName, fileName);
+
+        // Mettre à jour l'utilisateur avec la nouvelle URL d'avatar
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            { avatar: avatarUrl },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            res.status(404).json({
+                success: false,
+                message: 'Utilisateur non trouvé',
+            });
+            return;
+        }
+
+        // Notification WebSocket de mise à jour d'avatar
+        websocketService.notifyUser(req.user._id, 'success', 'Avatar mis à jour avec succès');
+        websocketService.notifyAdmins(
+            'info',
+            `Avatar mis à jour: ${updatedUser.firstName} ${updatedUser.lastName}`
+        );
+
+        // Notification de mise à jour du profil pour synchroniser l'avatar
+        websocketService.notifyProfileUpdate(updatedUser._id.toString(), {
+            id: updatedUser._id,
+            email: updatedUser.email,
+            firstName: updatedUser.firstName,
+            lastName: updatedUser.lastName,
+            phone: updatedUser.phone,
+            avatar: updatedUser.avatar,
+            role: updatedUser.role,
+            isActive: updatedUser.isActive,
+            lastLogin: updatedUser.lastLogin,
+            createdAt: updatedUser.createdAt,
+            updatedAt: updatedUser.updatedAt,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Avatar uploadé avec succès',
+            data: {
+                avatarUrl: avatarUrl,
+            },
+        });
+    } catch (error) {
+        console.error("Erreur lors de l'upload d'avatar:", error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur interne du serveur',
+        });
+    }
+};
+
+// Supprimer l'avatar
+export const removeAvatar = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            res.status(404).json({
+                success: false,
+                message: 'Utilisateur non trouvé',
+            });
+            return;
+        }
+
+        if (!user.avatar) {
+            res.status(400).json({
+                success: false,
+                message: 'Aucun avatar à supprimer',
+            });
+            return;
+        }
+
+        // Extraire le nom de fichier de l'URL
+        const fileName = user.avatar.split('/').slice(-2).join('/');
+        const bucketName = 'gallery';
+
+        // Supprimer le fichier de MinIO
+        const deleteSuccess = await minioService.deleteFile(bucketName, fileName);
+
+        if (!deleteSuccess) {
+            console.warn('Impossible de supprimer le fichier de MinIO, mais on continue');
+        }
+
+        // Supprimer l'URL de l'avatar de la base de données
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            { $unset: { avatar: 1 } },
+            { new: true }
+        );
+
+        // Notification WebSocket de suppression d'avatar
+        if (updatedUser) {
+            websocketService.notifyUser(req.user._id, 'success', 'Avatar réinitialisé avec succès');
+            websocketService.notifyAdmins(
+                'info',
+                `Avatar supprimé: ${updatedUser.firstName} ${updatedUser.lastName}`
+            );
+
+            // Notification de mise à jour du profil pour synchroniser la suppression
+            websocketService.notifyProfileUpdate(updatedUser._id.toString(), {
+                id: updatedUser._id,
+                email: updatedUser.email,
+                firstName: updatedUser.firstName,
+                lastName: updatedUser.lastName,
+                phone: updatedUser.phone,
+                avatar: updatedUser.avatar, // Sera undefined après suppression
+                role: updatedUser.role,
+                isActive: updatedUser.isActive,
+                lastLogin: updatedUser.lastLogin,
+                createdAt: updatedUser.createdAt,
+                updatedAt: updatedUser.updatedAt,
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Avatar supprimé avec succès',
+        });
+    } catch (error) {
+        console.error("Erreur lors de la suppression d'avatar:", error);
         res.status(500).json({
             success: false,
             message: 'Erreur interne du serveur',

@@ -13,8 +13,11 @@ router.use(authenticateToken);
 
 // Routes de profil utilisateur
 router.get('/profile', authController.getProfile);
+router.put('/profile', authController.updateProfile);
 router.post('/refresh-token', authController.refreshToken);
-router.post('/change-password', authController.changePassword);
+router.put('/change-password', authController.changePassword);
+router.post('/avatar', authController.uploadAvatarMiddleware, authController.uploadAvatar);
+router.delete('/avatar', authController.removeAvatar);
 
 // Routes admin (nécessitent le rôle admin)
 router.use(requireAdmin);

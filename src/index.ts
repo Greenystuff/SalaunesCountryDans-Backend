@@ -5,11 +5,12 @@ import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-
+import { createServer } from 'http';
 import { connectDB } from './config/database';
 import { initializeDatabase } from './config/init';
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
+import websocketService from './services/websocketService';
 
 // Routes
 import authRoutes from './routes/auth';
@@ -24,7 +25,11 @@ import dashboardRoutes from './routes/dashboard';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const server = createServer(app);
+const PORT = Number(process.env.PORT) || 3000;
+
+// Initialiser express-ws très tôt, AVANT les middlewares
+websocketService.initialize(app, server);
 
 // Configuration CORS
 const corsOptions = {
@@ -112,14 +117,17 @@ const startServer = async () => {
         // Initialisation de la base de données
         await initializeDatabase();
 
-        app.listen(PORT, () => {
-            console.log(`🚀 Serveur démarré sur le port ${PORT}`);
+        server.listen(PORT, '0.0.0.0', () => {
+            console.log(`🚀 Serveur HTTP démarré sur 0.0.0.0:${PORT}`);
+            console.log(`⚡ WebSocket service initialisé avec express-ws`);
             console.log(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
             console.log(`🔒 Admin: http://localhost:${PORT}/admin`);
             console.log(`💃 Danses: http://localhost:${PORT}/dances`);
             console.log(`🖼️ Galerie: http://localhost:${PORT}/gallery`);
             console.log(`👥 Membres: http://localhost:${PORT}/members`);
             console.log(`💚 Health: http://localhost:${PORT}/health`);
+            console.log(`🔌 WebSocket: ws://localhost:${PORT}/ws`);
+            console.log(`🐳 Accessible depuis l'hôte sur toutes les interfaces`);
         });
     } catch (error) {
         console.error('❌ Erreur lors du démarrage du serveur:', error);

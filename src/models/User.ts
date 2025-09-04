@@ -6,6 +6,8 @@ export interface IUser extends Document {
     password: string;
     firstName: string;
     lastName: string;
+    phone?: string;
+    avatar?: string;
     role: 'admin' | 'user';
     isActive: boolean;
     lastLogin?: Date;
@@ -44,6 +46,15 @@ const userSchema = new Schema<IUser>(
             required: [true, 'Le nom est requis'],
             trim: true,
             maxlength: [50, 'Le nom ne peut pas dépasser 50 caractères'],
+        },
+        phone: {
+            type: String,
+            trim: true,
+            match: [/^(\+33|0)[1-9](\d{8})$/, 'Format de téléphone invalide'],
+        },
+        avatar: {
+            type: String,
+            trim: true,
         },
         role: {
             type: String,
