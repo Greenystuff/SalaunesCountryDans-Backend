@@ -43,13 +43,15 @@ export class PdfCacheService {
             const pdfOptions = {
                 format: 'A4' as const,
                 margin: {
-                    top: '10mm',
-                    right: '10mm',
-                    bottom: '10mm',
-                    left: '10mm',
+                    top: '5mm',
+                    right: '12mm',
+                    bottom: '5mm',
+                    left: '12mm',
                 },
                 printBackground: true,
                 displayHeaderFooter: false,
+                preferCSSPageSize: true,
+                omitBackground: false,
             };
 
             const htmlFile = { content: htmlContent };
