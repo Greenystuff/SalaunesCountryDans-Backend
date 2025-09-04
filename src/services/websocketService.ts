@@ -61,10 +61,8 @@ class WebSocketService {
         // Utiliser le serveur HTTP si fourni, sinon laisser express-ws le créer
         if (server) {
             this.wsInstance = expressWs(app, server);
-            console.log('📡 Express-WS initialisé avec serveur HTTP explicite');
         } else {
             this.wsInstance = expressWs(app);
-            console.log('📡 Express-WS initialisé avec serveur par défaut');
         }
 
         // Route WebSocket avec authentification
@@ -86,9 +84,6 @@ class WebSocketService {
                     ws.close(1008, 'Authentication failed');
                 });
         });
-
-        console.log('🚀 WebSocket service initialized with express-ws');
-        console.log('📡 Route WebSocket disponible: ws://localhost:3000/ws');
     }
 
     /**

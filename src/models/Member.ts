@@ -201,7 +201,6 @@ memberSchema.pre('validate', function (next) {
 });
 
 // Index pour optimiser les requêtes
-memberSchema.index({ email: 1 });
 memberSchema.index({ lastName: 1, firstName: 1 });
 memberSchema.index({ city: 1 });
 memberSchema.index({ postalCode: 1 });

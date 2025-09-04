@@ -78,7 +78,6 @@ DanceSchema.pre('save', function (next) {
 });
 
 // Index composés pour les recherches fréquentes
-DanceSchema.index({ level: 1 });
 DanceSchema.index({ name: 'text' }); // Index de texte pour la recherche
 
 // Méthodes statiques
