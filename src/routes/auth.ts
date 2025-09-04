@@ -7,6 +7,7 @@ const router = express.Router();
 // Routes d'authentification (publiques)
 router.post('/login', authController.login);
 router.post('/logout', authController.logout);
+router.get('/validate-password-change', authController.validatePasswordChange);
 
 // Routes protégées (nécessitent une authentification)
 router.use(authenticateToken);
@@ -15,7 +16,7 @@ router.use(authenticateToken);
 router.get('/profile', authController.getProfile);
 router.put('/profile', authController.updateProfile);
 router.post('/refresh-token', authController.refreshToken);
-router.put('/change-password', authController.changePassword);
+router.put('/change-password', authController.requestPasswordChange);
 router.post('/avatar', authController.uploadAvatarMiddleware, authController.uploadAvatar);
 router.delete('/avatar', authController.removeAvatar);
 

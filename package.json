@@ -4,7 +4,7 @@
     "description": "Backend Express TypeScript pour Salaunes Country Dans",
     "main": "dist/index.js",
     "scripts": {
-        "build": "tsc --noEmitOnError false --skipLibCheck --noImplicitAny false",
+        "build": "tsc --noEmitOnError false --skipLibCheck --noImplicitAny false && cp -r src/templates dist/",
         "build:dev": "tsc --noEmitOnError false --skipLibCheck",
         "start": "node dist/index.js",
         "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
@@ -25,6 +25,7 @@
     "license": "CodeCrafted",
     "dependencies": {
         "@types/express-ws": "^3.0.5",
+        "@types/nodemailer": "^7.0.1",
         "@types/sharp": "^0.31.1",
         "@types/uuid": "^10.0.0",
         "axios": "^1.6.2",
@@ -43,6 +44,7 @@
         "mongoose": "^8.0.3",
         "morgan": "^1.10.1",
         "multer": "^2.0.2",
+        "nodemailer": "^7.0.6",
         "sharp": "^0.34.3",
         "uuid": "^11.1.0"
     },

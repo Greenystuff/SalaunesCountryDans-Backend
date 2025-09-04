@@ -1,11 +1,14 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
+import { PasswordChangeRequest } from '../models/PasswordChangeRequest';
 import { JWTPayload } from '../middleware/auth';
 import minioService from '../services/minioService';
 import websocketService from '../services/websocketService';
+import { sendPasswordChangeValidation } from '../services/emailService';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcryptjs';
 
 // Générer un token JWT
 const generateToken = (userId: string, email: string, role: string): string => {
@@ -187,8 +190,8 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
     }
 };
 
-// Changer le mot de passe
-export const changePassword = async (req: Request, res: Response): Promise<void> => {
+// Demander un changement de mot de passe (avec validation par email)
+export const requestPasswordChange = async (req: Request, res: Response): Promise<void> => {
     try {
         const { currentPassword, newPassword } = req.body;
 
@@ -229,16 +232,123 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
             return;
         }
 
-        // Mettre à jour le mot de passe
-        user.password = newPassword;
-        await user.save();
+        // Supprimer les anciennes demandes de cet utilisateur
+        await PasswordChangeRequest.deleteMany({
+            userId: user._id,
+            isUsed: false,
+        });
+
+        // Créer une nouvelle demande de changement
+        const validationToken = uuidv4();
+        const newPasswordHash = await bcrypt.hash(newPassword, 12);
+        const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+        const passwordChangeRequest = new PasswordChangeRequest({
+            userId: user._id,
+            token: validationToken,
+            newPasswordHash,
+            userEmail: user.email,
+            userName: `${user.firstName} ${user.lastName}`.trim() || user.email,
+            ipAddress: req.ip || req.connection.remoteAddress,
+            userAgent: req.get('User-Agent'),
+            expiresAt,
+        });
+
+        await passwordChangeRequest.save();
+
+        // Envoyer un email de validation
+        const expiresAtFormatted = expiresAt.toLocaleString('fr-FR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Europe/Paris',
+        });
+
+        // Envoyer l'email (comme SafeTale, on laisse l'exception remonter)
+        await sendPasswordChangeValidation({
+            userName: passwordChangeRequest.userName,
+            userEmail: user.email,
+            validationToken,
+            ipAddress: passwordChangeRequest.ipAddress,
+            userAgent: passwordChangeRequest.userAgent,
+            expiresAt: expiresAtFormatted,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Email de validation envoyé. Vérifiez votre boîte de réception.',
+        });
+    } catch (error) {
+        console.error('Erreur lors de la demande de changement de mot de passe:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur interne du serveur',
+        });
+    }
+};
+
+// Valider le changement de mot de passe
+export const validatePasswordChange = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { token } = req.query;
+
+        if (!token || typeof token !== 'string') {
+            res.status(400).json({
+                success: false,
+                message: 'Token de validation requis',
+            });
+            return;
+        }
+
+        // Trouver la demande de changement
+        const passwordRequest = await PasswordChangeRequest.findOne({
+            token,
+            isUsed: false,
+            expiresAt: { $gt: new Date() },
+        });
+
+        if (!passwordRequest) {
+            res.status(400).json({
+                success: false,
+                message: 'Token invalide ou expiré',
+            });
+            return;
+        }
+
+        // Trouver l'utilisateur
+        const user = await User.findById(passwordRequest.userId);
+        if (!user) {
+            res.status(404).json({
+                success: false,
+                message: 'Utilisateur non trouvé',
+            });
+            return;
+        }
+
+        // Changer le mot de passe (le hash est déjà calculé)
+        await User.findByIdAndUpdate(user._id, {
+            password: passwordRequest.newPasswordHash,
+        });
+
+        // Marquer la demande comme utilisée
+        passwordRequest.isUsed = true;
+        await passwordRequest.save();
+
+        // Notification WebSocket
+        websocketService.notifyUser(
+            user._id.toString(),
+            'success',
+            'Mot de passe modifié avec succès'
+        );
 
         res.status(200).json({
             success: true,
             message: 'Mot de passe modifié avec succès',
         });
     } catch (error) {
-        console.error('Erreur lors du changement de mot de passe:', error);
+        console.error('Erreur lors de la validation du changement de mot de passe:', error);
         res.status(500).json({
             success: false,
             message: 'Erreur interne du serveur',
