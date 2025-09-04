@@ -343,6 +343,34 @@ export const validatePasswordChange = async (req: Request, res: Response): Promi
             'Mot de passe modifié avec succès'
         );
 
+        // Créer une notification persistante
+        try {
+            const notificationService = (await import('../services/notificationService')).default;
+            await notificationService.createNotification({
+                userId: user._id.toString(),
+                title: 'Mot de passe modifié',
+                message: `Votre mot de passe a été modifié avec succès le ${new Date().toLocaleString(
+                    'fr-FR'
+                )} depuis l'adresse IP ${passwordRequest.ipAddress || 'inconnue'}.`,
+                type: 'success',
+                category: 'security',
+                isPersistent: true,
+                metadata: {
+                    ipAddress: passwordRequest.ipAddress,
+                    userAgent: passwordRequest.userAgent,
+                    timestamp: new Date(),
+                    action: 'password_change_validated',
+                },
+                actionUrl: '/profile',
+                actionText: 'Voir mon profil',
+                sendRealTime: false, // Déjà envoyé via websocket
+            });
+
+            console.log('✅ Notification persistante créée pour changement de mot de passe');
+        } catch (notifError) {
+            console.warn('⚠️ Impossible de créer la notification persistante:', notifError);
+        }
+
         res.status(200).json({
             success: true,
             message: 'Mot de passe modifié avec succès',

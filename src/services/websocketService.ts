@@ -145,6 +145,9 @@ class WebSocketService {
             user: ws.user,
         });
 
+        // Envoyer les notifications en attente
+        this.sendPendingNotifications(userId);
+
         // Gestion des messages reçus
         ws.on('message', (data: Buffer) => {
             try {
@@ -261,16 +264,26 @@ class WebSocketService {
         userId: string,
         type: 'success' | 'error' | 'warning' | 'info',
         message: string,
-        title?: string
+        titleOrData?: string | any
     ): void {
         const userSockets = this.authenticatedUsers.get(userId);
         if (userSockets) {
             userSockets.forEach((ws) => {
-                this.sendMessage(ws, 'notification', {
-                    type,
-                    message,
-                    title,
-                });
+                // Si titleOrData est un string, c'est un titre. Sinon, c'est des données enrichies
+                if (typeof titleOrData === 'string') {
+                    this.sendMessage(ws, 'notification', {
+                        type,
+                        message,
+                        title: titleOrData,
+                    });
+                } else {
+                    // Envoyer avec les données enrichies
+                    this.sendMessage(ws, 'notification', {
+                        type,
+                        message,
+                        ...titleOrData,
+                    });
+                }
             });
         }
     }
@@ -386,6 +399,19 @@ class WebSocketService {
                 socket.close(1000, reason);
             });
             this.authenticatedUsers.delete(userId);
+        }
+    }
+
+    /**
+     * Envoyer les notifications en attente à un utilisateur qui vient de se connecter
+     */
+    private async sendPendingNotifications(userId: string): Promise<void> {
+        try {
+            // Import dynamique pour éviter les dépendances circulaires
+            const notificationService = (await import('./notificationService')).default;
+            await notificationService.sendPendingNotifications(userId);
+        } catch (error) {
+            console.error("❌ Erreur lors de l'envoi des notifications en attente:", error);
         }
     }
 }

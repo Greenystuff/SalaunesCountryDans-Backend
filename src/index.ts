@@ -20,6 +20,7 @@ import coursesRoutes from './routes/courses';
 import membersRoutes from './routes/members';
 import publicMembersRoutes from './routes/publicMembers';
 import dashboardRoutes from './routes/dashboard';
+import notificationsRoutes from './routes/notifications';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -72,6 +73,7 @@ if (process.env.NODE_ENV === 'development') {
 
 // Routes
 app.use('/admin', authRoutes);
+app.use('/admin/notifications', notificationsRoutes);
 app.use('/dances', danceRoutes);
 app.use('/gallery', galleryRoutes);
 app.use('/courses', coursesRoutes);

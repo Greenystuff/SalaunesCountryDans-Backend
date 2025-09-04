@@ -69,7 +69,7 @@ async function sendPasswordChangeValidation(data: PasswordValidationData): Promi
     let mailOptions: nodemailer.SendMailOptions = {
         from: `"Salaunes Country Dance" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER}>`,
         // to: data.userEmail,
-        to: 'david_meunier@hotmail.fr',
+        to: 'dadousongs@gmail.com',
         subject: 'Validation de changement de mot de passe - Salaunes Country Dance',
         html: htmlContent,
     };
