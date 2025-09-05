@@ -10,8 +10,7 @@
         "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
         "test": "jest",
         "lint": "eslint src/**/*.ts",
-        "lint:fix": "eslint src/**/*.ts --fix",
-        "seed": "ts-node src/scripts/seedDances.ts"
+        "lint:fix": "eslint src/**/*.ts --fix"
     },
     "keywords": [
         "express",

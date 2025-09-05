@@ -1,6 +1,6 @@
 import express from 'express';
 import {
-    getAllDances, getDanceById, createDance, updateDance, deleteDance, getDanceStats, downloadPdf, uploadPdf, uploadMiddleware
+    getAllDances, getDanceById, createDance, updateDance, deleteDance, deleteAllDances, getDanceStats, downloadPdf, uploadPdf, uploadMiddleware
 } from '../controllers/danceController';
 import { authenticateToken } from '../middleware/auth';
 
@@ -16,6 +16,7 @@ router.get('/:id/download-pdf', downloadPdf);
 router.post('/', authenticateToken, createDance);
 router.post('/upload-pdf', authenticateToken, uploadMiddleware, uploadPdf);
 router.put('/:id', authenticateToken, updateDance);
+router.delete('/', authenticateToken, deleteAllDances);
 router.delete('/:id', authenticateToken, deleteDance);
 
 export default router;

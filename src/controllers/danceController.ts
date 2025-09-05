@@ -458,3 +458,41 @@ export const downloadPdf = async (req: Request, res: Response) => {
         });
     }
 };
+
+// Supprimer toutes les danses
+export const deleteAllDances = async (req: Request, res: Response) => {
+    try {
+        // Récupérer toutes les danses pour supprimer leurs fichiers PDF
+        const dances = await Dance.find({});
+        
+        // Supprimer les fichiers PDF associés
+        for (const dance of dances) {
+            if (dance.pdfFile) {
+                try {
+                    await minioService.deleteFile('dances', dance.pdfFile);
+                } catch (fileError) {
+                    console.warn(`Impossible de supprimer le fichier PDF ${dance.pdfFile}:`, fileError);
+                }
+            }
+        }
+
+        // Supprimer toutes les danses de la base de données
+        const result = await Dance.deleteMany({});
+        
+        console.log(`✅ ${result.deletedCount} danses supprimées avec succès`);
+
+        res.json({
+            success: true,
+            message: `${result.deletedCount} danses supprimées avec succès`,
+            data: {
+                deletedCount: result.deletedCount,
+            },
+        });
+    } catch (error) {
+        console.error('Erreur lors de la suppression de toutes les danses:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la suppression de toutes les danses',
+        });
+    }
+};
