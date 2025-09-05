@@ -24,6 +24,7 @@ import dashboardRoutes from './routes/dashboard';
 import notificationsRoutes from './routes/notifications';
 import internalRulesRoutes from './routes/internalRules';
 import pdfRoutes from './routes/pdfRoutes';
+import usersRoutes from './routes/users';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -77,6 +78,7 @@ if (process.env.NODE_ENV === 'development') {
 // Routes
 app.use('/admin', authRoutes);
 app.use('/admin/notifications', notificationsRoutes);
+app.use('/admin/users', usersRoutes);
 app.use('/dances', danceRoutes);
 app.use('/gallery', galleryRoutes);
 app.use('/courses', coursesRoutes);

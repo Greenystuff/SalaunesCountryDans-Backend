@@ -8,7 +8,8 @@ export interface IUser extends Document {
     lastName: string;
     phone?: string;
     avatar?: string;
-    role: 'admin' | 'user';
+    role: 'admin' | 'manager' | 'user';
+    permissions?: string[];
     isActive: boolean;
     lastLogin?: Date;
     passwordChangedAt?: Date;
@@ -58,8 +59,12 @@ const userSchema = new Schema<IUser>(
         },
         role: {
             type: String,
-            enum: ['admin', 'user'],
+            enum: ['admin', 'manager', 'user'],
             default: 'user',
+        },
+        permissions: {
+            type: [String],
+            default: [],
         },
         isActive: {
             type: Boolean,
@@ -124,12 +129,18 @@ userSchema.pre('save', async function (next) {
     }
 };
 
+// Importer les permissions disponibles
+import { availablePermissions } from '../config/permissions';
+
 // Méthode statique pour créer un utilisateur admin par défaut
 (userSchema.statics as any).createDefaultAdmin = async function () {
     try {
         const adminExists = await this.findOne({ role: 'admin' });
 
         if (!adminExists) {
+            // Récupérer toutes les permissions disponibles
+            const permissions = [...availablePermissions];
+
             const defaultAdmin = new this({
                 email: 'bisabell@free.fr',
                 password: 'Yesyoucan',
@@ -137,13 +148,26 @@ userSchema.pre('save', async function (next) {
                 lastName: 'Boutin',
                 role: 'admin',
                 isActive: true,
+                permissions: permissions, // Ajouter toutes les permissions
             });
 
             await defaultAdmin.save();
-            console.log('✅ Utilisateur admin par défaut créé');
+            console.log('✅ Utilisateur admin par défaut créé avec toutes les permissions');
+        } else {
+            // Vérifier que l'admin existant a bien toutes les permissions
+            const permissions = [...availablePermissions];
+            const needsUpdate = !adminExists.permissions || 
+                                adminExists.permissions.length !== permissions.length ||
+                                permissions.some(p => !adminExists.permissions.includes(p));
+
+            if (needsUpdate) {
+                adminExists.permissions = permissions;
+                await adminExists.save();
+                console.log('✅ Permissions de l\'admin par défaut mises à jour');
+            }
         }
     } catch (error) {
-        console.error("❌ Erreur lors de la création de l'admin par défaut:", error);
+        console.error("❌ Erreur lors de la création/mise à jour de l'admin par défaut:", error);
     }
 };
 

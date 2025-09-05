@@ -114,6 +114,36 @@ export const requireRole = (roles: string[]) => {
     };
 };
 
+// Middleware pour vérifier les permissions spécifiques
+export const requirePermission = (permission: string) => {
+    return (req: Request, res: Response, next: NextFunction): void => {
+        if (!req.user) {
+            res.status(401).json({
+                success: false,
+                message: 'Authentification requise',
+            });
+            return;
+        }
+
+        // L'admin a toutes les permissions
+        if (req.user.role === 'admin') {
+            next();
+            return;
+        }
+
+        // Vérifier si l'utilisateur a la permission requise
+        if (!req.user.permissions || !req.user.permissions.includes(permission)) {
+            res.status(403).json({
+                success: false,
+                message: 'Permission insuffisante',
+            });
+            return;
+        }
+
+        next();
+    };
+};
+
 // Middleware spécifique pour les administrateurs
 export const requireAdmin = requireRole(['admin']);
 
