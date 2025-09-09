@@ -6,6 +6,16 @@ interface ICheckDeposit {
     depositDate: Date;
 }
 
+// Interface pour les inscriptions aux événements
+interface IEventEnrollment {
+    eventId: mongoose.Types.ObjectId;
+    isRecurring: boolean; // true si c'est une inscription récurrente
+    isAllOccurrences?: boolean; // true si c'est une inscription à toutes les occurrences
+    occurrenceDate?: Date; // Date spécifique pour les occurrences individuelles
+    trialDate?: Date; // Date d'essai choisie par l'utilisateur (pour les événements récurrents)
+    enrollmentDate: Date; // Date d'inscription
+}
+
 // Interface pour le membre
 export interface IMember extends Document {
     firstName: string;
@@ -18,7 +28,7 @@ export interface IMember extends Document {
     mobilePhone?: string;
     email: string;
     imageRights: boolean;
-    enrolledCourses: mongoose.Types.ObjectId[];
+    enrolledEvents: IEventEnrollment[];
     status: 'pré-inscrit' | 'inscrit' | 'actif' | 'inactif';
 
     // Date d'essai prévue (pour les pré-inscrits)
@@ -26,16 +36,20 @@ export interface IMember extends Document {
 
     // Champs remplis par l'admin
     registrationDate?: Date;
-    annualFeePaymentMethod?: 'chèque' | 'Espèce';
-    membershipPaymentMethod?: 'chèque' | 'Espèce';
     checkDeposits?: ICheckDeposit[];
 
     createdAt: Date;
     updatedAt: Date;
 
     // Méthodes d'instance
-    enrollInCourse(courseId: mongoose.Types.ObjectId): Promise<IMember>;
-    unenrollFromCourse(courseId: mongoose.Types.ObjectId): Promise<IMember>;
+    enrollInEvent(
+        eventId: mongoose.Types.ObjectId,
+        isRecurring?: boolean,
+        occurrenceDate?: Date,
+        isAllOccurrences?: boolean,
+        trialDate?: Date
+    ): Promise<IMember>;
+    unenrollFromEvent(eventId: mongoose.Types.ObjectId, occurrenceDate?: Date): Promise<IMember>;
     addCheckDeposit(amount: number, depositDate: Date): Promise<IMember>;
 }
 
@@ -49,6 +63,53 @@ const checkDepositSchema = new Schema<ICheckDeposit>(
         depositDate: {
             type: Date,
             required: [true, 'La date de dépôt est requise'],
+        },
+    },
+    { _id: false }
+);
+
+const eventEnrollmentSchema = new Schema<IEventEnrollment>(
+    {
+        eventId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Event',
+            required: [true, "L'ID de l'événement est requis"],
+        },
+        isRecurring: {
+            type: Boolean,
+            required: [true, 'Le type de récurrence est requis'],
+            default: false,
+        },
+        isAllOccurrences: {
+            type: Boolean,
+            default: false,
+        },
+        occurrenceDate: {
+            type: Date,
+            required: function (this: IEventEnrollment) {
+                // occurrenceDate est requis seulement si c'est récurrent ET pas "toutes les occurrences"
+                return this.isRecurring && !this.isAllOccurrences;
+            },
+            validate: {
+                validator: function (this: IEventEnrollment, occurrenceDate: Date) {
+                    // Si c'est récurrent et pas "toutes les occurrences", occurrenceDate est requis
+                    if (this.isRecurring && !this.isAllOccurrences && !occurrenceDate) {
+                        return false;
+                    }
+                    return true;
+                },
+                message:
+                    "La date d'occurrence est requise pour les événements récurrents individuels",
+            },
+        },
+        trialDate: {
+            type: Date,
+            required: false, // Optionnel - date d'essai choisie par l'utilisateur
+        },
+        enrollmentDate: {
+            type: Date,
+            required: [true, "La date d'inscription est requise"],
+            default: Date.now,
         },
     },
     { _id: false }
@@ -129,12 +190,7 @@ const memberSchema = new Schema<IMember>(
             required: [true, "Le droit à l'image est requis"],
             default: false,
         },
-        enrolledCourses: [
-            {
-                type: Schema.Types.ObjectId,
-                ref: 'Course',
-            },
-        ],
+        enrolledEvents: [eventEnrollmentSchema],
         status: {
             type: String,
             required: [true, 'Le statut est requis'],
@@ -154,20 +210,6 @@ const memberSchema = new Schema<IMember>(
                     return registrationDate <= new Date();
                 },
                 message: "La date d'inscription ne peut pas être dans le futur",
-            },
-        },
-        annualFeePaymentMethod: {
-            type: String,
-            enum: {
-                values: ['chèque', 'Espèce'],
-                message: 'Le moyen de paiement doit être "chèque" ou "Espèce"',
-            },
-        },
-        membershipPaymentMethod: {
-            type: String,
-            enum: {
-                values: ['chèque', 'Espèce'],
-                message: 'Le moyen de paiement doit être "chèque" ou "Espèce"',
             },
         },
         intendedTrialDate: {
@@ -204,7 +246,7 @@ memberSchema.pre('validate', function (next) {
 memberSchema.index({ lastName: 1, firstName: 1 });
 memberSchema.index({ city: 1 });
 memberSchema.index({ postalCode: 1 });
-memberSchema.index({ enrolledCourses: 1 });
+memberSchema.index({ enrolledEvents: 1 });
 
 // Méthode virtuelle pour calculer l'âge
 memberSchema.virtual('age').get(function (this: IMember) {
@@ -229,17 +271,74 @@ memberSchema.virtual('primaryPhone').get(function (this: IMember) {
     return this.mobilePhone || this.homePhone;
 });
 
-// Méthode pour ajouter un cours
-memberSchema.methods.enrollInCourse = function (courseId: mongoose.Types.ObjectId) {
-    if (!this.enrolledCourses.includes(courseId)) {
-        this.enrolledCourses.push(courseId);
+// Méthode pour ajouter un événement
+memberSchema.methods.enrollInEvent = function (
+    eventId: mongoose.Types.ObjectId,
+    isRecurring = false,
+    occurrenceDate?: Date,
+    isAllOccurrences = false,
+    trialDate?: Date
+) {
+    // Vérifier si l'inscription existe déjà
+    const existingEnrollment = this.enrolledEvents.find((enrollment) => {
+        if (enrollment.eventId.equals(eventId)) {
+            if (isRecurring && isAllOccurrences) {
+                // Pour "toutes les occurrences", vérifier qu'il n'y a pas déjà une inscription globale
+                return enrollment.isRecurring && enrollment.isAllOccurrences;
+            } else if (isRecurring && occurrenceDate) {
+                // Pour les événements récurrents individuels, vérifier la date d'occurrence
+                return (
+                    enrollment.isRecurring &&
+                    !enrollment.isAllOccurrences &&
+                    enrollment.occurrenceDate?.getTime() === occurrenceDate.getTime()
+                );
+            } else if (!isRecurring) {
+                // Pour les événements simples, vérifier qu'il n'est pas déjà récurrent
+                return !enrollment.isRecurring;
+            }
+        }
+        return false;
+    });
+
+    if (!existingEnrollment) {
+        const enrollment: IEventEnrollment = {
+            eventId,
+            isRecurring,
+            isAllOccurrences,
+            occurrenceDate,
+            trialDate,
+            enrollmentDate: new Date(),
+        };
+        this.enrolledEvents.push(enrollment);
     }
     return this.save();
 };
 
-// Méthode pour retirer un cours
-memberSchema.methods.unenrollFromCourse = function (courseId: mongoose.Types.ObjectId) {
-    this.enrolledCourses = this.enrolledCourses.filter((id) => !id.equals(courseId));
+// Méthode pour retirer un événement
+memberSchema.methods.unenrollFromEvent = function (
+    eventId: mongoose.Types.ObjectId,
+    occurrenceDate?: Date,
+    isAllOccurrences?: boolean
+) {
+    this.enrolledEvents = this.enrolledEvents.filter((enrollment) => {
+        if (enrollment.eventId.equals(eventId)) {
+            if (isAllOccurrences) {
+                // Supprimer l'inscription "toutes les occurrences"
+                return !(enrollment.isRecurring && enrollment.isAllOccurrences);
+            } else if (occurrenceDate) {
+                // Supprimer une occurrence spécifique
+                return !(
+                    enrollment.isRecurring &&
+                    !enrollment.isAllOccurrences &&
+                    enrollment.occurrenceDate?.getTime() === occurrenceDate.getTime()
+                );
+            } else {
+                // Supprimer toutes les inscriptions à cet événement
+                return false;
+            }
+        }
+        return true;
+    });
     return this.save();
 };
 
@@ -257,7 +356,7 @@ interface IMemberModel extends mongoose.Model<IMember> {
     findByCity(city: string): Promise<IMember[]>;
     findByAgeRange(minAge: number, maxAge: number): Promise<IMember[]>;
     findWithImageRights(): Promise<IMember[]>;
-    findEnrolledInCourse(courseId: mongoose.Types.ObjectId): Promise<IMember[]>;
+    findEnrolledInEvent(eventId: mongoose.Types.ObjectId): Promise<IMember[]>;
 }
 
 // Méthode statique pour récupérer les membres par ville
@@ -281,9 +380,9 @@ memberSchema.statics.findWithImageRights = function () {
     return this.find({ imageRights: true }).sort({ lastName: 1, firstName: 1 });
 };
 
-// Méthode statique pour récupérer les membres inscrits à un cours
-memberSchema.statics.findEnrolledInCourse = function (courseId: mongoose.Types.ObjectId) {
-    return this.find({ enrolledCourses: courseId }).sort({ lastName: 1, firstName: 1 });
+// Méthode statique pour récupérer les membres inscrits à un événement
+memberSchema.statics.findEnrolledInEvent = function (eventId: mongoose.Types.ObjectId) {
+    return this.find({ 'enrolledEvents.eventId': eventId }).sort({ lastName: 1, firstName: 1 });
 };
 
 export const Member = mongoose.model<IMember, IMemberModel>('Member', memberSchema) as IMemberModel;

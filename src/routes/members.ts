@@ -8,12 +8,12 @@ import {
     deleteMember,
     searchMembers,
     getMemberStats,
-    enrollMemberInCourse,
-    unenrollMemberFromCourse,
+    enrollMemberInEvent,
+    unenrollMemberFromEvent,
     getMembersByCity,
     getMembersByAgeRange,
     getMembersWithImageRights,
-    getMembersEnrolledInCourse,
+    getMembersEnrolledInEvent,
 } from '../controllers/memberController';
 import chequesRouter from './cheques';
 
@@ -33,9 +33,9 @@ router.post('/', createMember);
 router.put('/:id', updateMember);
 router.delete('/:id', deleteMember);
 
-// Routes pour l'inscription aux cours
-router.post('/:memberId/courses/:courseId/enroll', enrollMemberInCourse);
-router.delete('/:memberId/courses/:courseId/enroll', unenrollMemberFromCourse);
+// Routes pour l'inscription aux événements
+router.post('/:memberId/events/:eventId/enroll', enrollMemberInEvent);
+router.delete('/:memberId/events/:eventId/enroll', unenrollMemberFromEvent);
 
 // Routes pour les chèques
 router.use('/:memberId/checks', chequesRouter);
@@ -44,6 +44,6 @@ router.use('/:memberId/checks', chequesRouter);
 router.get('/city/:city', getMembersByCity);
 router.get('/age/:minAge/:maxAge', getMembersByAgeRange);
 router.get('/image-rights/with', getMembersWithImageRights);
-router.get('/courses/:courseId/members', getMembersEnrolledInCourse);
+router.get('/events/:eventId/members', getMembersEnrolledInEvent);
 
 export default router;

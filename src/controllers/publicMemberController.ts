@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Member } from '../models/Member';
+import { Event } from '../models/Event';
 
 // Inscription publique d'un nouveau membre
 export const publicRegister = async (req: Request, res: Response) => {
@@ -13,6 +14,18 @@ export const publicRegister = async (req: Request, res: Response) => {
                 success: false,
                 message: 'Un membre avec cet email existe déjà',
             });
+        }
+
+        // Vérifier que les événements existent si fournis
+        if (memberData.enrolledEvents && memberData.enrolledEvents.length > 0) {
+            const eventIds = memberData.enrolledEvents.map((enrollment: any) => enrollment.eventId);
+            const events = await Event.find({ _id: { $in: eventIds } });
+            if (events.length !== eventIds.length) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Certains événements spécifiés n'existent pas",
+                });
+            }
         }
 
         // Créer le membre avec le statut "pré-inscrit"

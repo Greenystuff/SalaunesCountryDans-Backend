@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { Course, ICourse } from '../models/Course';
+import { Event, IEvent } from '../models/Event';
 
-// Récupérer tous les cours
-export const getAllCourses = async (req: Request, res: Response) => {
+// Récupérer tous les événements
+export const getAllEvents = async (req: Request, res: Response) => {
     try {
         const {
             page = 1,
@@ -10,18 +10,20 @@ export const getAllCourses = async (req: Request, res: Response) => {
             sortBy = 'start',
             sortOrder = 'asc',
             q,
+            type,
             level,
-            teacher,
+            instructor,
         } = req.query;
 
-        console.log('Paramètres reçus pour les cours:', {
+        console.log('Paramètres reçus pour les événements:', {
             page,
             limit,
             sortBy,
             sortOrder,
             q,
+            type,
             level,
-            teacher,
+            instructor,
         });
 
         const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
@@ -31,14 +33,19 @@ export const getAllCourses = async (req: Request, res: Response) => {
         // Construire la requête avec les filtres
         let query: any = {};
 
-        // Recherche par titre, description, teacher, location
+        // Recherche par titre, description, instructor, location
         if (q) {
             query.$or = [
                 { title: { $regex: q, $options: 'i' } },
                 { description: { $regex: q, $options: 'i' } },
-                { teacher: { $regex: q, $options: 'i' } },
+                { instructor: { $regex: q, $options: 'i' } },
                 { location: { $regex: q, $options: 'i' } },
             ];
+        }
+
+        // Filtre par type
+        if (type) {
+            query.type = type;
         }
 
         // Filtre par niveau
@@ -46,23 +53,26 @@ export const getAllCourses = async (req: Request, res: Response) => {
             query.level = level;
         }
 
-        // Filtre par animateur
-        if (teacher) {
-            query.teacher = { $regex: teacher, $options: 'i' };
+        // Filtre par instructeur
+        if (instructor) {
+            query.instructor = { $regex: instructor, $options: 'i' };
         }
 
-        console.log('Requête MongoDB construite pour les cours:', JSON.stringify(query, null, 2));
+        console.log(
+            'Requête MongoDB construite pour les événements:',
+            JSON.stringify(query, null, 2)
+        );
 
-        const courses = await Course.find(query)
+        const events = await Event.find(query)
             .sort(sort)
             .skip(skip)
             .limit(parseInt(limit as string));
 
-        const total = await Course.countDocuments(query);
+        const total = await Event.countDocuments(query);
 
         res.json({
             success: true,
-            data: courses,
+            data: events,
             pagination: {
                 page: parseInt(page as string),
                 limit: parseInt(limit as string),
@@ -71,34 +81,34 @@ export const getAllCourses = async (req: Request, res: Response) => {
             },
         });
     } catch (error) {
-        console.error('❌ Erreur lors de la récupération des cours:', error);
+        console.error('❌ Erreur lors de la récupération des événements:', error);
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la récupération des cours',
+            message: 'Erreur lors de la récupération des événements',
         });
     }
 };
 
-// Récupérer les cours à venir
-export const getUpcomingCourses = async (req: Request, res: Response) => {
+// Récupérer les événements à venir
+export const getUpcomingEvents = async (req: Request, res: Response) => {
     try {
         const limit = parseInt(req.query.limit as string) || 20;
-        const courses = await Course.findUpcoming(limit);
+        const events = await Event.findUpcoming(limit);
         res.json({
             success: true,
-            data: courses,
+            data: events,
         });
     } catch (error) {
-        console.error('❌ Erreur lors de la récupération des cours à venir:', error);
+        console.error('❌ Erreur lors de la récupération des événements à venir:', error);
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la récupération des cours à venir',
+            message: 'Erreur lors de la récupération des événements à venir',
         });
     }
 };
 
-// Récupérer les cours d'une date spécifique
-export const getCoursesByDate = async (req: Request, res: Response) => {
+// Récupérer les événements d'une date spécifique
+export const getEventsByDate = async (req: Request, res: Response) => {
     try {
         const { date } = req.params;
         const targetDate = new Date(date);
@@ -110,53 +120,53 @@ export const getCoursesByDate = async (req: Request, res: Response) => {
             });
         }
 
-        const courses = await Course.findByDate(targetDate);
+        const events = await Event.findByDate(targetDate);
         res.json({
             success: true,
-            data: courses,
+            data: events,
         });
     } catch (error) {
-        console.error('❌ Erreur lors de la récupération des cours par date:', error);
+        console.error('❌ Erreur lors de la récupération des événements par date:', error);
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la récupération des cours',
+            message: 'Erreur lors de la récupération des événements',
         });
     }
 };
 
-// Récupérer un cours par ID
-export const getCourseById = async (req: Request, res: Response) => {
+// Récupérer un événement par ID
+export const getEventById = async (req: Request, res: Response) => {
     try {
-        const course = await Course.findById(req.params.id);
+        const event = await Event.findById(req.params.id);
 
-        if (!course) {
+        if (!event) {
             return res.status(404).json({
                 success: false,
-                message: 'Cours non trouvé',
+                message: 'Événement non trouvé',
             });
         }
 
         res.json({
             success: true,
-            data: course,
+            data: event,
         });
     } catch (error) {
-        console.error('❌ Erreur lors de la récupération du cours:', error);
+        console.error("❌ Erreur lors de la récupération de l'événement:", error);
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la récupération du cours',
+            message: "Erreur lors de la récupération de l'événement",
         });
     }
 };
 
-// Créer un nouveau cours
-export const createCourse = async (req: Request, res: Response) => {
+// Créer un nouvel événement
+export const createEvent = async (req: Request, res: Response) => {
     try {
-        const courseData = req.body;
+        const eventData = req.body;
 
         // Validation des dates
-        const start = new Date(courseData.start);
-        const end = new Date(courseData.end);
+        const start = new Date(eventData.start);
+        const end = new Date(eventData.end);
 
         if (isNaN(start.getTime()) || isNaN(end.getTime())) {
             return res.status(400).json({
@@ -173,8 +183,8 @@ export const createCourse = async (req: Request, res: Response) => {
         }
 
         // Validation de la date de fin de récurrence si fournie
-        if (courseData.recurrenceEndDate) {
-            const recurrenceEndDate = new Date(courseData.recurrenceEndDate);
+        if (eventData.recurrenceEndDate) {
+            const recurrenceEndDate = new Date(eventData.recurrenceEndDate);
             if (isNaN(recurrenceEndDate.getTime()) || recurrenceEndDate <= start) {
                 return res.status(400).json({
                     success: false,
@@ -184,24 +194,24 @@ export const createCourse = async (req: Request, res: Response) => {
             }
         }
 
-        const course = new Course({
-            ...courseData,
+        const event = new Event({
+            ...eventData,
             start,
             end,
         });
 
-        await course.save();
+        await event.save();
 
         res.status(201).json({
             success: true,
-            data: course,
+            data: event,
             message:
-                course.recurrence !== 'Aucune'
-                    ? 'Cours récurrent créé avec succès et occurrences générées'
-                    : 'Cours créé avec succès',
+                event.recurrence !== 'Aucune'
+                    ? 'Événement récurrent créé avec succès et occurrences générées'
+                    : 'Événement créé avec succès',
         });
     } catch (error: any) {
-        console.error('❌ Erreur lors de la création du cours:', error);
+        console.error("❌ Erreur lors de la création de l'événement:", error);
 
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map((err: any) => err.message);
@@ -213,16 +223,24 @@ export const createCourse = async (req: Request, res: Response) => {
 
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la création du cours',
+            message: "Erreur lors de la création de l'événement",
         });
     }
 };
 
-// Mettre à jour un cours
-export const updateCourse = async (req: Request, res: Response) => {
+// Mettre à jour un événement
+export const updateEvent = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const updateData = req.body;
+
+        console.log('🔍 Backend reçoit pour update:', {
+            id,
+            start: updateData.start,
+            end: updateData.end,
+            startType: typeof updateData.start,
+            endType: typeof updateData.end,
+        });
 
         // Validation des dates si elles sont fournies
         if (updateData.start || updateData.end) {
@@ -265,28 +283,28 @@ export const updateCourse = async (req: Request, res: Response) => {
             }
         }
 
-        const course = await Course.findByIdAndUpdate(id, updateData, {
+        const event = await Event.findByIdAndUpdate(id, updateData, {
             new: true,
             runValidators: true,
         });
 
-        if (!course) {
+        if (!event) {
             return res.status(404).json({
                 success: false,
-                message: 'Cours non trouvé',
+                message: 'Événement non trouvé',
             });
         }
 
         res.json({
             success: true,
-            data: course,
+            data: event,
             message:
-                course.recurrence !== 'Aucune'
-                    ? 'Cours récurrent mis à jour avec succès et occurrences régénérées'
-                    : 'Cours mis à jour avec succès',
+                event.recurrence !== 'Aucune'
+                    ? 'Événement récurrent mis à jour avec succès et occurrences régénérées'
+                    : 'Événement mis à jour avec succès',
         });
     } catch (error: any) {
-        console.error('❌ Erreur lors de la mise à jour du cours:', error);
+        console.error("❌ Erreur lors de la mise à jour de l'événement:", error);
 
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map((err: any) => err.message);
@@ -298,41 +316,41 @@ export const updateCourse = async (req: Request, res: Response) => {
 
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la mise à jour du cours',
+            message: "Erreur lors de la mise à jour de l'événement",
         });
     }
 };
 
-// Supprimer un cours
-export const deleteCourse = async (req: Request, res: Response) => {
+// Supprimer un événement
+export const deleteEvent = async (req: Request, res: Response) => {
     try {
-        const course = await Course.findByIdAndDelete(req.params.id);
-        const success = !!course;
+        const event = await Event.findByIdAndDelete(req.params.id);
+        const success = !!event;
 
         if (!success) {
             return res.status(404).json({
                 success: false,
-                message: 'Cours non trouvé',
+                message: 'Événement non trouvé',
             });
         }
 
         res.json({
             success: true,
-            message: 'Cours supprimé avec succès',
+            message: 'Événement supprimé avec succès',
         });
     } catch (error) {
-        console.error('❌ Erreur lors de la suppression du cours:', error);
+        console.error("❌ Erreur lors de la suppression de l'événement:", error);
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la suppression du cours',
+            message: "Erreur lors de la suppression de l'événement",
         });
     }
 };
 
-// Rechercher des cours avec filtres
-export const searchCourses = async (req: Request, res: Response) => {
+// Rechercher des événements avec filtres
+export const searchEvents = async (req: Request, res: Response) => {
     try {
-        const { q, level, teacher, location, startDate, endDate } = req.query;
+        const { q, type, level, instructor, location, startDate, endDate } = req.query;
 
         const filter: any = {};
 
@@ -341,14 +359,15 @@ export const searchCourses = async (req: Request, res: Response) => {
             filter.$or = [
                 { title: { $regex: q, $options: 'i' } },
                 { description: { $regex: q, $options: 'i' } },
-                { teacher: { $regex: q, $options: 'i' } },
+                { instructor: { $regex: q, $options: 'i' } },
                 { location: { $regex: q, $options: 'i' } },
             ];
         }
 
         // Filtres spécifiques
+        if (type) filter.type = type;
         if (level) filter.level = level;
-        if (teacher) filter.teacher = { $regex: teacher, $options: 'i' };
+        if (instructor) filter.instructor = { $regex: instructor, $options: 'i' };
         if (location) filter.location = { $regex: location, $options: 'i' };
 
         // Filtre par période
@@ -358,27 +377,39 @@ export const searchCourses = async (req: Request, res: Response) => {
             if (endDate) filter.start.$lte = new Date(endDate as string);
         }
 
-        const courses = await Course.find(filter).sort({ start: 1 });
+        const events = await Event.find(filter).sort({ start: 1 });
 
         res.json({
             success: true,
-            data: courses,
+            data: events,
         });
     } catch (error) {
-        console.error('❌ Erreur lors de la recherche des cours:', error);
+        console.error('❌ Erreur lors de la recherche des événements:', error);
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la recherche des cours',
+            message: 'Erreur lors de la recherche des événements',
         });
     }
 };
 
-// Statistiques des cours
-export const getCourseStats = async (req: Request, res: Response) => {
+// Statistiques des événements
+export const getEventStats = async (req: Request, res: Response) => {
     try {
-        const totalCourses = await Course.countDocuments();
+        const totalEvents = await Event.countDocuments();
 
-        const levelStats = await Course.aggregate([
+        const typeStats = await Event.aggregate([
+            {
+                $group: {
+                    _id: '$type',
+                    count: { $sum: 1 },
+                },
+            },
+        ]);
+
+        const levelStats = await Event.aggregate([
+            {
+                $match: { level: { $exists: true, $ne: null } },
+            },
             {
                 $group: {
                     _id: '$level',
@@ -387,13 +418,13 @@ export const getCourseStats = async (req: Request, res: Response) => {
             },
         ]);
 
-        const teacherStats = await Course.aggregate([
+        const instructorStats = await Event.aggregate([
             {
-                $match: { teacher: { $exists: true, $ne: '' } },
+                $match: { instructor: { $exists: true, $ne: '' } },
             },
             {
                 $group: {
-                    _id: '$teacher',
+                    _id: '$instructor',
                     count: { $sum: 1 },
                 },
             },
@@ -405,12 +436,12 @@ export const getCourseStats = async (req: Request, res: Response) => {
             },
         ]);
 
-        const upcomingCount = await Course.countDocuments({
+        const upcomingCount = await Event.countDocuments({
             end: { $gte: new Date() },
         });
 
-        // Statistiques des cours récurrents
-        const recurringStats = await Course.aggregate([
+        // Statistiques des événements récurrents
+        const recurringStats = await Event.aggregate([
             {
                 $match: { recurrence: { $ne: 'Aucune' } },
             },
@@ -425,10 +456,11 @@ export const getCourseStats = async (req: Request, res: Response) => {
         res.json({
             success: true,
             data: {
-                total: totalCourses,
+                total: totalEvents,
                 upcoming: upcomingCount,
+                byType: typeStats,
                 byLevel: levelStats,
-                byTeacher: teacherStats,
+                byInstructor: instructorStats,
                 recurring: recurringStats,
             },
         });
@@ -441,22 +473,40 @@ export const getCourseStats = async (req: Request, res: Response) => {
     }
 };
 
-// Récupérer les cours récurrents
-export const getRecurringCourses = async (req: Request, res: Response) => {
+// Récupérer les événements récurrents
+export const getRecurringEvents = async (req: Request, res: Response) => {
     try {
-        const courses = await Course.find({
+        const events = await Event.find({
             recurrence: { $ne: 'Aucune' },
         }).sort({ start: 1 });
 
         res.json({
             success: true,
-            data: courses,
+            data: events,
         });
     } catch (error) {
-        console.error('❌ Erreur lors de la récupération des cours récurrents:', error);
+        console.error('❌ Erreur lors de la récupération des événements récurrents:', error);
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la récupération des cours récurrents',
+            message: 'Erreur lors de la récupération des événements récurrents',
+        });
+    }
+};
+
+// Récupérer les événements par type
+export const getEventsByType = async (req: Request, res: Response) => {
+    try {
+        const { type } = req.params;
+        const events = await Event.findByType(type);
+        res.json({
+            success: true,
+            data: events,
+        });
+    } catch (error) {
+        console.error('❌ Erreur lors de la récupération des événements par type:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la récupération des événements par type',
         });
     }
 };

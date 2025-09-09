@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Member } from '../models/Member';
-import { Course } from '../models/Course';
-import { Cheque } from '../models/Cheque';
+import { Event } from '../models/Event';
+import Payment, { IPayment } from '../models/Payment';
 import Dance from '../models/Dance';
 import Gallery from '../models/Gallery';
 
@@ -27,30 +27,30 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         // Membres avec droit à l'image
         const membersWithImageRights = await Member.countDocuments({ imageRights: true });
 
-        // Statistiques des cours
-        const totalCourses = await Course.countDocuments();
-        const upcomingCourses = await Course.countDocuments({
+        // Statistiques des événements
+        const totalEvents = await Event.countDocuments();
+        const upcomingEvents = await Event.countDocuments({
             start: { $gte: now },
         });
 
-        // Cours de cette semaine
+        // Événements de cette semaine
         const startOfWeek = new Date(now);
         startOfWeek.setDate(now.getDate() - now.getDay());
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(startOfWeek.getDate() + 6);
 
-        const coursesThisWeek = await Course.countDocuments({
+        const eventsThisWeek = await Event.countDocuments({
             start: { $gte: startOfWeek, $lte: endOfWeek },
         });
 
-        // Statistiques financières
-        const totalCheques = await Cheque.countDocuments();
-        const chequesRecus = await Cheque.countDocuments({ status: 'recu' });
-        const chequesCredites = await Cheque.countDocuments({ status: 'credite' });
+        // Statistiques financières (paiements)
+        const totalPayments = await Payment.countDocuments();
+        const paymentsByMethod = await Payment.aggregate([
+            { $group: { _id: '$paymentMethod', count: { $sum: 1 } } },
+        ]);
 
-        // Montant total des chèques crédités
-        const totalCreditedAmount = await Cheque.aggregate([
-            { $match: { status: 'credite' } },
+        // Montant total des paiements
+        const totalAmount = await Payment.aggregate([
             { $group: { _id: null, total: { $sum: '$amount' } } },
         ]);
 
@@ -74,8 +74,9 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             { $limit: 5 },
         ]);
 
-        // Répartition par niveau des cours
-        const courseLevels = await Course.aggregate([
+        // Répartition par niveau des événements
+        const eventLevels = await Event.aggregate([
+            { $match: { level: { $exists: true, $ne: null } } },
             { $group: { _id: '$level', count: { $sum: 1 } } },
             { $sort: { count: -1 } },
         ]);
@@ -104,38 +105,39 @@ export const getDashboardStats = async (req: Request, res: Response) => {
             { $sort: { '_id.year': 1, '_id.month': 1 } },
         ]);
 
-        // Prochains cours (limités à 5) - avec gestion de la récurrence
-        const allCourses = await Course.find({}).select(
-            'title level start end teacher location recurrence'
+        // Prochains événements (limités à 5) - avec gestion de la récurrence
+        const allEvents = await Event.find({}).select(
+            'title type level start end instructor location recurrence'
         );
-        const nextCourses = [];
+        const nextEvents = [];
 
-        for (const course of allCourses) {
-            if (course.recurrence === 'Aucune') {
-                // Cours ponctuel : l'ajouter s'il est à venir
-                if (new Date(course.end) >= now) {
-                    nextCourses.push({
-                        title: course.title,
-                        level: course.level,
-                        start: course.start,
-                        end: course.end,
-                        teacher: course.teacher,
-                        location: course.location,
+        for (const event of allEvents) {
+            if (event.recurrence === 'Aucune') {
+                // Événement ponctuel : l'ajouter s'il est à venir
+                if (new Date(event.end) >= now) {
+                    nextEvents.push({
+                        title: event.title,
+                        type: event.type,
+                        level: event.level,
+                        start: event.start,
+                        end: event.end,
+                        instructor: event.instructor,
+                        location: event.location,
                     });
                 }
             } else {
-                // Cours récurrent : calculer la prochaine occurrence
-                const courseStart = new Date(course.start);
-                const courseEnd = new Date(course.end);
-                const duration = courseEnd.getTime() - courseStart.getTime();
+                // Événement récurrent : calculer la prochaine occurrence
+                const eventStart = new Date(event.start);
+                const eventEnd = new Date(event.end);
+                const duration = eventEnd.getTime() - eventStart.getTime();
 
                 // Calculer la prochaine occurrence
-                let nextOccurrence = new Date(courseStart);
+                let nextOccurrence = new Date(eventStart);
                 const today = new Date();
 
                 // Trouver la prochaine occurrence à partir d'aujourd'hui
                 while (nextOccurrence < today) {
-                    switch (course.recurrence) {
+                    switch (event.recurrence) {
                         case 'Hebdomadaire':
                             nextOccurrence.setDate(nextOccurrence.getDate() + 7);
                             break;
@@ -148,23 +150,24 @@ export const getDashboardStats = async (req: Request, res: Response) => {
                     }
                 }
 
-                // Si la prochaine occurrence est dans le futur, ajouter le cours
+                // Si la prochaine occurrence est dans le futur, ajouter l'événement
                 if (nextOccurrence >= today) {
-                    nextCourses.push({
-                        title: course.title,
-                        level: course.level,
+                    nextEvents.push({
+                        title: event.title,
+                        type: event.type,
+                        level: event.level,
                         start: nextOccurrence,
                         end: new Date(nextOccurrence.getTime() + duration),
-                        teacher: course.teacher,
-                        location: course.location,
+                        instructor: event.instructor,
+                        location: event.location,
                     });
                 }
             }
         }
 
         // Trier par date de début et limiter à 5
-        nextCourses.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-        const limitedNextCourses = nextCourses.slice(0, 5);
+        nextEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        const limitedNextEvents = nextEvents.slice(0, 5);
 
         // Derniers membres inscrits (limités à 5)
         const recentMembers = await Member.find()
@@ -178,10 +181,10 @@ export const getDashboardStats = async (req: Request, res: Response) => {
                 // Statistiques générales
                 overview: {
                     totalMembers,
-                    totalCourses,
+                    totalEvents,
                     totalDances,
                     totalImages,
-                    totalCheques,
+                    totalPayments,
                 },
 
                 // Statistiques des membres
@@ -201,12 +204,12 @@ export const getDashboardStats = async (req: Request, res: Response) => {
                     })),
                 },
 
-                // Statistiques des cours
-                courses: {
-                    total: totalCourses,
-                    upcoming: upcomingCourses,
-                    thisWeek: coursesThisWeek,
-                    byLevel: courseLevels.map((level) => ({
+                // Statistiques des événements
+                events: {
+                    total: totalEvents,
+                    upcoming: upcomingEvents,
+                    thisWeek: eventsThisWeek,
+                    byLevel: eventLevels.map((level) => ({
                         level: level._id,
                         count: level.count,
                     })),
@@ -214,10 +217,9 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 
                 // Statistiques financières
                 finances: {
-                    totalCheques,
-                    recus: chequesRecus,
-                    credites: chequesCredites,
-                    totalCreditedAmount: totalCreditedAmount[0]?.total || 0,
+                    totalPayments,
+                    byMethod: paymentsByMethod,
+                    totalAmount: totalAmount[0]?.total || 0,
                 },
 
                 // Statistiques des danses
@@ -247,7 +249,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 
                 // Données récentes
                 recent: {
-                    nextCourses: limitedNextCourses,
+                    nextEvents: limitedNextEvents,
                     recentMembers: recentMembers.map((member) => ({
                         name: `${member.firstName} ${member.lastName}`,
                         status: member.status,

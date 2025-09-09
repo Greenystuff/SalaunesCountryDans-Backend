@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { Member, IMember } from '../models/Member';
-import { Course } from '../models/Course';
+import { Event } from '../models/Event';
 
 // Récupérer tous les membres
 export const getAllMembers = async (req: Request, res: Response) => {
@@ -62,7 +62,10 @@ export const getAllMembers = async (req: Request, res: Response) => {
         console.log('Requête MongoDB construite:', JSON.stringify(query, null, 2));
 
         const members = await Member.find(query)
-            .populate('enrolledCourses', 'title level start end teacher location')
+            .populate(
+                'enrolledEvents.eventId',
+                'title type level start end instructor location recurrence'
+            )
             .sort(sort)
             .skip(skip)
             .limit(parseInt(limit as string));
@@ -92,8 +95,8 @@ export const getAllMembers = async (req: Request, res: Response) => {
 export const getMemberById = async (req: Request, res: Response) => {
     try {
         const member = await Member.findById(req.params.id).populate(
-            'enrolledCourses',
-            'title level start end teacher location'
+            'enrolledEvents.eventId',
+            'title type level start end instructor location'
         );
 
         if (!member) {
@@ -130,13 +133,14 @@ export const createMember = async (req: Request, res: Response) => {
             });
         }
 
-        // Vérifier que les cours existent si fournis
-        if (memberData.enrolledCourses && memberData.enrolledCourses.length > 0) {
-            const courses = await Course.find({ _id: { $in: memberData.enrolledCourses } });
-            if (courses.length !== memberData.enrolledCourses.length) {
+        // Vérifier que les événements existent si fournis
+        if (memberData.enrolledEvents && memberData.enrolledEvents.length > 0) {
+            const eventIds = memberData.enrolledEvents.map((enrollment: any) => enrollment.eventId);
+            const events = await Event.find({ _id: { $in: eventIds } });
+            if (events.length !== eventIds.length) {
                 return res.status(400).json({
                     success: false,
-                    message: "Certains cours spécifiés n'existent pas",
+                    message: "Certains événements spécifiés n'existent pas",
                 });
             }
         }
@@ -145,8 +149,8 @@ export const createMember = async (req: Request, res: Response) => {
         await member.save();
 
         const populatedMember = await Member.findById(member._id).populate(
-            'enrolledCourses',
-            'title level start'
+            'enrolledEvents.eventId',
+            'title type level start end recurrence'
         );
 
         res.status(201).json({
@@ -193,13 +197,14 @@ export const updateMember = async (req: Request, res: Response) => {
             }
         }
 
-        // Vérifier que les cours existent si fournis
-        if (updateData.enrolledCourses && updateData.enrolledCourses.length > 0) {
-            const courses = await Course.find({ _id: { $in: updateData.enrolledCourses } });
-            if (courses.length !== updateData.enrolledCourses.length) {
+        // Vérifier que les événements existent si fournis
+        if (updateData.enrolledEvents && updateData.enrolledEvents.length > 0) {
+            const eventIds = updateData.enrolledEvents.map((enrollment: any) => enrollment.eventId);
+            const events = await Event.find({ _id: { $in: eventIds } });
+            if (events.length !== eventIds.length) {
                 return res.status(400).json({
                     success: false,
-                    message: "Certains cours spécifiés n'existent pas",
+                    message: "Certains événements spécifiés n'existent pas",
                 });
             }
         }
@@ -207,7 +212,7 @@ export const updateMember = async (req: Request, res: Response) => {
         const member = await Member.findByIdAndUpdate(id, updateData, {
             new: true,
             runValidators: true,
-        }).populate('enrolledCourses', 'title level start');
+        }).populate('enrolledEvents.eventId', 'title type level start end recurrence');
 
         if (!member) {
             return res.status(404).json({
@@ -268,7 +273,7 @@ export const deleteMember = async (req: Request, res: Response) => {
 // Rechercher des membres
 export const searchMembers = async (req: Request, res: Response) => {
     try {
-        const { q, city, ageMin, ageMax, imageRights, courseId } = req.query;
+        const { q, city, ageMin, ageMax, imageRights, eventId } = req.query;
 
         let query: any = {};
 
@@ -311,13 +316,13 @@ export const searchMembers = async (req: Request, res: Response) => {
             query.imageRights = imageRights === 'true';
         }
 
-        // Filtre par cours
-        if (courseId) {
-            query.enrolledCourses = courseId;
+        // Filtre par événement
+        if (eventId) {
+            query['enrolledEvents.eventId'] = eventId;
         }
 
         const members = await Member.find(query)
-            .populate('enrolledCourses', 'title level start')
+            .populate('enrolledEvents.eventId', 'title type level start end recurrence')
             .sort({ lastName: 1, firstName: 1 });
 
         res.json({
@@ -396,10 +401,10 @@ export const getMemberStats = async (req: Request, res: Response) => {
     }
 };
 
-// Inscrire un membre à un cours
-export const enrollMemberInCourse = async (req: Request, res: Response) => {
+// Inscrire un membre à un événement
+export const enrollMemberInEvent = async (req: Request, res: Response) => {
     try {
-        const { memberId, courseId } = req.params;
+        const { memberId, eventId } = req.params;
 
         const member = await Member.findById(memberId);
         if (!member) {
@@ -409,39 +414,39 @@ export const enrollMemberInCourse = async (req: Request, res: Response) => {
             });
         }
 
-        const course = await Course.findById(courseId);
-        if (!course) {
+        const event = await Event.findById(eventId);
+        if (!event) {
             return res.status(404).json({
                 success: false,
-                message: 'Cours non trouvé',
+                message: 'Événement non trouvé',
             });
         }
 
-        await member.enrollInCourse(new mongoose.Types.ObjectId(courseId));
+        await member.enrollInEvent(new mongoose.Types.ObjectId(eventId));
 
         const updatedMember = await Member.findById(memberId).populate(
-            'enrolledCourses',
-            'title level start'
+            'enrolledEvents.eventId',
+            'title type level start'
         );
 
         res.json({
             success: true,
             data: updatedMember,
-            message: 'Membre inscrit au cours avec succès',
+            message: "Membre inscrit à l'événement avec succès",
         });
     } catch (error) {
-        console.error("❌ Erreur lors de l'inscription au cours:", error);
+        console.error("❌ Erreur lors de l'inscription à l'événement:", error);
         res.status(500).json({
             success: false,
-            message: "Erreur lors de l'inscription au cours",
+            message: "Erreur lors de l'inscription à l'événement",
         });
     }
 };
 
-// Désinscrire un membre d'un cours
-export const unenrollMemberFromCourse = async (req: Request, res: Response) => {
+// Désinscrire un membre d'un événement
+export const unenrollMemberFromEvent = async (req: Request, res: Response) => {
     try {
-        const { memberId, courseId } = req.params;
+        const { memberId, eventId } = req.params;
 
         const member = await Member.findById(memberId);
         if (!member) {
@@ -451,23 +456,23 @@ export const unenrollMemberFromCourse = async (req: Request, res: Response) => {
             });
         }
 
-        await member.unenrollFromCourse(new mongoose.Types.ObjectId(courseId));
+        await member.unenrollFromEvent(new mongoose.Types.ObjectId(eventId));
 
         const updatedMember = await Member.findById(memberId).populate(
-            'enrolledCourses',
-            'title level start'
+            'enrolledEvents.eventId',
+            'title type level start'
         );
 
         res.json({
             success: true,
             data: updatedMember,
-            message: 'Membre désinscrit du cours avec succès',
+            message: "Membre désinscrit de l'événement avec succès",
         });
     } catch (error) {
-        console.error('❌ Erreur lors de la désinscription du cours:', error);
+        console.error("❌ Erreur lors de la désinscription de l'événement:", error);
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la désinscription du cours',
+            message: "Erreur lors de la désinscription de l'événement",
         });
     }
 };
@@ -507,8 +512,8 @@ export const getMembersByCity = async (req: Request, res: Response) => {
         const { city } = req.params;
         const members = await Member.findByCity(city);
         const populatedMembers = await Member.populate(members, {
-            path: 'enrolledCourses',
-            select: 'title level start',
+            path: 'enrolledEvents',
+            select: 'title type level start',
         });
 
         res.json({
@@ -530,8 +535,8 @@ export const getMembersByAgeRange = async (req: Request, res: Response) => {
         const { minAge, maxAge } = req.params;
         const members = await Member.findByAgeRange(parseInt(minAge), parseInt(maxAge));
         const populatedMembers = await Member.populate(members, {
-            path: 'enrolledCourses',
-            select: 'title level start',
+            path: 'enrolledEvents',
+            select: 'title type level start',
         });
 
         res.json({
@@ -552,8 +557,8 @@ export const getMembersWithImageRights = async (req: Request, res: Response) => 
     try {
         const members = await Member.findWithImageRights();
         const populatedMembers = await Member.populate(members, {
-            path: 'enrolledCourses',
-            select: 'title level start',
+            path: 'enrolledEvents',
+            select: 'title type level start',
         });
 
         res.json({
@@ -569,14 +574,14 @@ export const getMembersWithImageRights = async (req: Request, res: Response) => 
     }
 };
 
-// Récupérer les membres inscrits à un cours
-export const getMembersEnrolledInCourse = async (req: Request, res: Response) => {
+// Récupérer les membres inscrits à un événement
+export const getMembersEnrolledInEvent = async (req: Request, res: Response) => {
     try {
-        const { courseId } = req.params;
-        const members = await Member.findEnrolledInCourse(new mongoose.Types.ObjectId(courseId));
+        const { eventId } = req.params;
+        const members = await Member.findEnrolledInEvent(new mongoose.Types.ObjectId(eventId));
         const populatedMembers = await Member.populate(members, {
-            path: 'enrolledCourses',
-            select: 'title level start',
+            path: 'enrolledEvents',
+            select: 'title type level start',
         });
 
         res.json({
@@ -584,10 +589,10 @@ export const getMembersEnrolledInCourse = async (req: Request, res: Response) =>
             data: populatedMembers,
         });
     } catch (error) {
-        console.error('❌ Erreur lors de la récupération des membres du cours:', error);
+        console.error("❌ Erreur lors de la récupération des membres de l'événement:", error);
         res.status(500).json({
             success: false,
-            message: 'Erreur lors de la récupération des membres du cours',
+            message: "Erreur lors de la récupération des membres de l'événement",
         });
     }
 };

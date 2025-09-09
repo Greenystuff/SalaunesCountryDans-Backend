@@ -17,7 +17,7 @@ import { PdfCacheService } from './services/pdfCacheService';
 import authRoutes from './routes/auth';
 import danceRoutes from './routes/dances';
 import galleryRoutes from './routes/gallery';
-import coursesRoutes from './routes/courses';
+import eventsRoutes from './routes/events';
 import membersRoutes from './routes/members';
 import publicMembersRoutes from './routes/publicMembers';
 import dashboardRoutes from './routes/dashboard';
@@ -25,6 +25,7 @@ import notificationsRoutes from './routes/notifications';
 import internalRulesRoutes from './routes/internalRules';
 import pdfRoutes from './routes/pdfRoutes';
 import usersRoutes from './routes/users';
+import paymentRoutes from './routes/paymentRoutes';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -81,12 +82,13 @@ app.use('/admin/notifications', notificationsRoutes);
 app.use('/admin/users', usersRoutes);
 app.use('/dances', danceRoutes);
 app.use('/gallery', galleryRoutes);
-app.use('/courses', coursesRoutes);
+app.use('/events', eventsRoutes);
 app.use('/members', membersRoutes);
 app.use('/public/members', publicMembersRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/internal-rules', internalRulesRoutes);
 app.use('/generate-pdf', pdfRoutes);
+app.use('/', paymentRoutes);
 
 // Route de santé
 app.get('/health', (req, res) => {
