@@ -1,6 +1,57 @@
 import { Request, Response } from 'express';
 import { Event, IEvent } from '../models/Event';
 
+// Fonction utilitaire pour parser les dates locales
+function parseLocalDate(dateString: string): Date {
+    // Si c'est au format ISO sans Z, l'interpréter comme locale
+    if (dateString.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?$/)) {
+        const [datePart, timePart] = dateString.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [time, ms] = timePart.split('.');
+        const [hours, minutes, seconds] = time.split(':').map(Number);
+
+        // Créer une date locale
+        return new Date(year, month - 1, day, hours, minutes, seconds || 0);
+    }
+    // Fallback pour les autres formats
+    return new Date(dateString);
+}
+
+// Fonction utilitaire pour formater les dates en local pour la réponse
+function formatEventForResponse(event: any): any {
+    const eventObj = event.toObject ? event.toObject() : event;
+
+    // Formater les dates en local (sans Z)
+    if (eventObj.start) {
+        const startDate = new Date(eventObj.start);
+        eventObj.start = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(
+            2,
+            '0'
+        )}-${String(startDate.getDate()).padStart(2, '0')}T${String(startDate.getHours()).padStart(
+            2,
+            '0'
+        )}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(
+            startDate.getSeconds()
+        ).padStart(2, '0')}.000`;
+    }
+
+    if (eventObj.end) {
+        const endDate = new Date(eventObj.end);
+        eventObj.end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(
+            2,
+            '0'
+        )}-${String(endDate.getDate()).padStart(2, '0')}T${String(endDate.getHours()).padStart(
+            2,
+            '0'
+        )}:${String(endDate.getMinutes()).padStart(2, '0')}:${String(endDate.getSeconds()).padStart(
+            2,
+            '0'
+        )}.000`;
+    }
+
+    return eventObj;
+}
+
 // Récupérer tous les événements
 export const getAllEvents = async (req: Request, res: Response) => {
     try {
@@ -70,9 +121,12 @@ export const getAllEvents = async (req: Request, res: Response) => {
 
         const total = await Event.countDocuments(query);
 
+        // Formater les événements pour la réponse
+        const formattedEvents = events.map((event) => formatEventForResponse(event));
+
         res.json({
             success: true,
-            data: events,
+            data: formattedEvents,
             pagination: {
                 page: parseInt(page as string),
                 limit: parseInt(limit as string),
@@ -94,9 +148,13 @@ export const getUpcomingEvents = async (req: Request, res: Response) => {
     try {
         const limit = parseInt(req.query.limit as string) || 20;
         const events = await Event.findUpcoming(limit);
+
+        // Formater les événements pour la réponse
+        const formattedEvents = events.map((event) => formatEventForResponse(event));
+
         res.json({
             success: true,
-            data: events,
+            data: formattedEvents,
         });
     } catch (error) {
         console.error('❌ Erreur lors de la récupération des événements à venir:', error);
@@ -121,9 +179,13 @@ export const getEventsByDate = async (req: Request, res: Response) => {
         }
 
         const events = await Event.findByDate(targetDate);
+
+        // Formater les événements pour la réponse
+        const formattedEvents = events.map((event) => formatEventForResponse(event));
+
         res.json({
             success: true,
-            data: events,
+            data: formattedEvents,
         });
     } catch (error) {
         console.error('❌ Erreur lors de la récupération des événements par date:', error);
@@ -148,7 +210,7 @@ export const getEventById = async (req: Request, res: Response) => {
 
         res.json({
             success: true,
-            data: event,
+            data: formatEventForResponse(event),
         });
     } catch (error) {
         console.error("❌ Erreur lors de la récupération de l'événement:", error);
@@ -165,8 +227,8 @@ export const createEvent = async (req: Request, res: Response) => {
         const eventData = req.body;
 
         // Validation des dates
-        const start = new Date(eventData.start);
-        const end = new Date(eventData.end);
+        const start = parseLocalDate(eventData.start);
+        const end = parseLocalDate(eventData.end);
 
         if (isNaN(start.getTime()) || isNaN(end.getTime())) {
             return res.status(400).json({
@@ -184,7 +246,7 @@ export const createEvent = async (req: Request, res: Response) => {
 
         // Validation de la date de fin de récurrence si fournie
         if (eventData.recurrenceEndDate) {
-            const recurrenceEndDate = new Date(eventData.recurrenceEndDate);
+            const recurrenceEndDate = parseLocalDate(eventData.recurrenceEndDate);
             if (isNaN(recurrenceEndDate.getTime()) || recurrenceEndDate <= start) {
                 return res.status(400).json({
                     success: false,
@@ -204,7 +266,7 @@ export const createEvent = async (req: Request, res: Response) => {
 
         res.status(201).json({
             success: true,
-            data: event,
+            data: formatEventForResponse(event),
             message:
                 event.recurrence !== 'Aucune'
                     ? 'Événement récurrent créé avec succès et occurrences générées'
@@ -244,8 +306,8 @@ export const updateEvent = async (req: Request, res: Response) => {
 
         // Validation des dates si elles sont fournies
         if (updateData.start || updateData.end) {
-            const start = updateData.start ? new Date(updateData.start) : undefined;
-            const end = updateData.end ? new Date(updateData.end) : undefined;
+            const start = updateData.start ? parseLocalDate(updateData.start) : undefined;
+            const end = updateData.end ? parseLocalDate(updateData.end) : undefined;
 
             if (start && isNaN(start.getTime())) {
                 return res.status(400).json({
@@ -271,8 +333,8 @@ export const updateEvent = async (req: Request, res: Response) => {
 
         // Validation de la date de fin de récurrence si fournie
         if (updateData.recurrenceEndDate) {
-            const recurrenceEndDate = new Date(updateData.recurrenceEndDate);
-            const start = updateData.start ? new Date(updateData.start) : undefined;
+            const recurrenceEndDate = parseLocalDate(updateData.recurrenceEndDate);
+            const start = updateData.start ? parseLocalDate(updateData.start) : undefined;
 
             if (isNaN(recurrenceEndDate.getTime()) || (start && recurrenceEndDate <= start)) {
                 return res.status(400).json({
@@ -297,7 +359,7 @@ export const updateEvent = async (req: Request, res: Response) => {
 
         res.json({
             success: true,
-            data: event,
+            data: formatEventForResponse(event),
             message:
                 event.recurrence !== 'Aucune'
                     ? 'Événement récurrent mis à jour avec succès et occurrences régénérées'
@@ -379,9 +441,12 @@ export const searchEvents = async (req: Request, res: Response) => {
 
         const events = await Event.find(filter).sort({ start: 1 });
 
+        // Formater les événements pour la réponse
+        const formattedEvents = events.map((event) => formatEventForResponse(event));
+
         res.json({
             success: true,
-            data: events,
+            data: formattedEvents,
         });
     } catch (error) {
         console.error('❌ Erreur lors de la recherche des événements:', error);
