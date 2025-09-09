@@ -51,12 +51,16 @@ const corsOptions = {
 // Configuration Rate Limiting
 const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // limite chaque IP à 100 requêtes par fenêtre
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000'), // limite chaque IP à 1000 requêtes par fenêtre (plus tolérant)
     message: {
         error: 'Trop de requêtes depuis cette IP, veuillez réessayer plus tard.',
     },
     standardHeaders: true,
     legacyHeaders: false,
+    // Ignorer les requêtes réussies pour éviter de pénaliser les utilisateurs légitimes
+    skipSuccessfulRequests: true,
+    // Ignorer les requêtes d'erreur 4xx (sauf 429) pour éviter de pénaliser les erreurs client
+    skipFailedRequests: true,
 });
 
 // Middleware de sécurité et de performance

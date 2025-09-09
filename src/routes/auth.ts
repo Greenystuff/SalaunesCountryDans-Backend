@@ -1,11 +1,25 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import * as authController from '../controllers/authController';
 
 const router = express.Router();
 
+// Rate limiting spécifique pour l'authentification (plus restrictif)
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // limite à 10 tentatives de connexion par IP par fenêtre
+    message: {
+        error: 'Trop de tentatives de connexion. Veuillez réessayer dans 15 minutes.',
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Ne pas ignorer les requêtes échouées pour l'auth (sécurité)
+    skipFailedRequests: false,
+});
+
 // Routes d'authentification (publiques)
-router.post('/login', authController.login);
+router.post('/login', authLimiter, authController.login);
 router.post('/logout', authController.logout);
 router.get('/validate-password-change', authController.validatePasswordChange);
 
