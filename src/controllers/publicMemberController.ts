@@ -45,10 +45,8 @@ export const publicRegister = async (req: Request, res: Response) => {
         await member.save();
 
         // Notifier tous les managers de la nouvelle pré-inscription
-        console.log('🔔 Début de la notification des managers pour le membre:', member._id);
         try {
             await notifyManagersOfNewPreRegistration(member);
-            console.log('✅ Notification des managers terminée');
         } catch (notificationError) {
             console.error('❌ Erreur lors de la notification des managers:', notificationError);
             // On continue même si la notification échoue
@@ -133,12 +131,6 @@ export const getPublicStats = async (req: Request, res: Response) => {
  */
 async function notifyManagersOfNewPreRegistration(member: any) {
     try {
-        console.log(
-            '📋 Fonction notifyManagersOfNewPreRegistration appelée pour:',
-            member.firstName,
-            member.lastName
-        );
-
         // Récupérer tous les utilisateurs avec le rôle 'manager' ou 'admin'
         const managers = await User.find({
             role: { $in: ['manager', 'admin'] },
@@ -146,7 +138,6 @@ async function notifyManagersOfNewPreRegistration(member: any) {
         });
 
         if (managers.length === 0) {
-            console.log('⚠️ Aucun manager trouvé pour la notification de pré-inscription');
             return;
         }
 
@@ -194,10 +185,6 @@ async function notifyManagersOfNewPreRegistration(member: any) {
                     actionText: 'Voir le profil',
                     sendRealTime: true,
                 });
-
-                console.log(
-                    `✅ Notification de pré-inscription envoyée au manager ${manager.email}`
-                );
             } catch (error) {
                 console.error(
                     `❌ Erreur lors de l'envoi de notification au manager ${manager.email}:`,
@@ -208,10 +195,6 @@ async function notifyManagersOfNewPreRegistration(member: any) {
 
         // Envoyer également une notification en temps réel via websocket à tous les managers connectés
         websocketService.notifyAdmins('info', notificationMessage, notificationTitle);
-
-        console.log(
-            `📢 ${managers.length} manager(s) notifié(s) de la pré-inscription de ${member.firstName} ${member.lastName}`
-        );
     } catch (error) {
         console.error('❌ Erreur lors de la notification des managers:', error);
     }
