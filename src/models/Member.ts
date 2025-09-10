@@ -217,7 +217,9 @@ const memberSchema = new Schema<IMember>(
             validate: {
                 validator: function (this: IMember, trialDate: Date) {
                     if (!trialDate) return true; // Nullable
-                    return trialDate >= new Date(); // Doit être dans le futur
+                    // Comparer avec l'heure actuelle pour permettre les événements du jour même
+                    const now = new Date();
+                    return trialDate >= now; // Doit être dans le futur (avec l'heure)
                 },
                 message: "La date d'essai prévue doit être dans le futur",
             },
