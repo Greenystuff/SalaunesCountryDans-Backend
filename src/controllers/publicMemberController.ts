@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { Member } from '../models/Member';
 import { Event } from '../models/Event';
+import { User } from '../models/User';
+import notificationService from '../services/notificationService';
+import websocketService from '../services/websocketService';
 
 // Inscription publique d'un nouveau membre
 export const publicRegister = async (req: Request, res: Response) => {
@@ -40,6 +43,16 @@ export const publicRegister = async (req: Request, res: Response) => {
         });
 
         await member.save();
+
+        // Notifier tous les managers de la nouvelle pré-inscription
+        console.log('🔔 Début de la notification des managers pour le membre:', member._id);
+        try {
+            await notifyManagersOfNewPreRegistration(member);
+            console.log('✅ Notification des managers terminée');
+        } catch (notificationError) {
+            console.error('❌ Erreur lors de la notification des managers:', notificationError);
+            // On continue même si la notification échoue
+        }
 
         res.status(201).json({
             success: true,
@@ -114,3 +127,92 @@ export const getPublicStats = async (req: Request, res: Response) => {
         });
     }
 };
+
+/**
+ * Notifier tous les managers d'une nouvelle pré-inscription
+ */
+async function notifyManagersOfNewPreRegistration(member: any) {
+    try {
+        console.log(
+            '📋 Fonction notifyManagersOfNewPreRegistration appelée pour:',
+            member.firstName,
+            member.lastName
+        );
+
+        // Récupérer tous les utilisateurs avec le rôle 'manager' ou 'admin'
+        const managers = await User.find({
+            role: { $in: ['manager', 'admin'] },
+            isActive: true,
+        });
+
+        if (managers.length === 0) {
+            console.log('⚠️ Aucun manager trouvé pour la notification de pré-inscription');
+            return;
+        }
+
+        // Préparer les informations du membre pour la notification
+        const memberInfo = {
+            id: member._id,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            email: member.email,
+            city: member.city,
+            intendedTrialDate: member.intendedTrialDate,
+            enrolledEvents: member.enrolledEvents || [],
+            createdAt: member.createdAt,
+        };
+
+        // Créer le message de notification
+        const notificationTitle = 'Nouvelle pré-inscription';
+        const notificationMessage = `${member.firstName} ${member.lastName} s'est pré-inscrit(e)${
+            member.city ? ` depuis ${member.city}` : ''
+        }${
+            member.intendedTrialDate
+                ? ` pour un essai le ${new Date(member.intendedTrialDate).toLocaleDateString(
+                      'fr-FR'
+                  )}`
+                : ''
+        }.`;
+
+        // Notifier chaque manager
+        for (const manager of managers) {
+            try {
+                // Créer une notification persistante
+                await notificationService.createNotification({
+                    userId: manager._id.toString(),
+                    title: notificationTitle,
+                    message: notificationMessage,
+                    type: 'info',
+                    category: 'system',
+                    isPersistent: true,
+                    metadata: {
+                        memberId: member._id.toString(),
+                        memberInfo: memberInfo,
+                        actionType: 'new_pre_registration',
+                    },
+                    actionUrl: `/members/${member._id}`,
+                    actionText: 'Voir le profil',
+                    sendRealTime: true,
+                });
+
+                console.log(
+                    `✅ Notification de pré-inscription envoyée au manager ${manager.email}`
+                );
+            } catch (error) {
+                console.error(
+                    `❌ Erreur lors de l'envoi de notification au manager ${manager.email}:`,
+                    error
+                );
+            }
+        }
+
+        // Envoyer également une notification en temps réel via websocket à tous les managers connectés
+        websocketService.notifyAdmins('info', notificationMessage, notificationTitle);
+
+        console.log(
+            `📢 ${managers.length} manager(s) notifié(s) de la pré-inscription de ${member.firstName} ${member.lastName}`
+        );
+    } catch (error) {
+        console.error('❌ Erreur lors de la notification des managers:', error);
+    }
+}
