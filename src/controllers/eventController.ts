@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Event, IEvent } from '../models/Event';
+import { Member } from '../models/Member';
 
 // Fonction utilitaire pour parser les dates locales
 function parseLocalDate(dateString: string): Date {
@@ -386,25 +387,93 @@ export const updateEvent = async (req: Request, res: Response) => {
 // Supprimer un événement
 export const deleteEvent = async (req: Request, res: Response) => {
     try {
-        const event = await Event.findByIdAndDelete(req.params.id);
-        const success = !!event;
+        const eventId = req.params.id;
 
-        if (!success) {
+        // Vérifier que l'événement existe
+        const event = await Event.findById(eventId);
+        if (!event) {
             return res.status(404).json({
                 success: false,
                 message: 'Événement non trouvé',
             });
         }
 
+        // Compter les membres inscrits à cet événement
+        const enrolledMembers = await Member.find({
+            'enrolledEvents.eventId': eventId,
+        });
+
+        console.log(
+            `📊 ${enrolledMembers.length} membre(s) inscrit(s) à l'événement "${event.title}"`
+        );
+
+        // Désinscrire tous les membres de cet événement
+        if (enrolledMembers.length > 0) {
+            await Member.updateMany(
+                { 'enrolledEvents.eventId': eventId },
+                { $pull: { enrolledEvents: { eventId: eventId } } }
+            );
+            console.log(`✅ ${enrolledMembers.length} membre(s) désinscrit(s) de l'événement`);
+        }
+
+        // Supprimer l'événement
+        await Event.findByIdAndDelete(eventId);
+
         res.json({
             success: true,
-            message: 'Événement supprimé avec succès',
+            message:
+                enrolledMembers.length > 0
+                    ? `Événement supprimé avec succès. ${enrolledMembers.length} membre(s) désinscrit(s).`
+                    : 'Événement supprimé avec succès',
+            unenrolledCount: enrolledMembers.length,
         });
     } catch (error) {
         console.error("❌ Erreur lors de la suppression de l'événement:", error);
         res.status(500).json({
             success: false,
             message: "Erreur lors de la suppression de l'événement",
+        });
+    }
+};
+
+// Récupérer le nombre de membres inscrits à un événement
+export const getEventEnrollmentCount = async (req: Request, res: Response) => {
+    try {
+        const eventId = req.params.id;
+
+        // Vérifier que l'événement existe
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({
+                success: false,
+                message: 'Événement non trouvé',
+            });
+        }
+
+        // Compter les membres inscrits à cet événement
+        const enrolledMembers = await Member.find({
+            'enrolledEvents.eventId': eventId,
+        });
+
+        res.json({
+            success: true,
+            data: {
+                eventId,
+                eventTitle: event.title,
+                enrollmentCount: enrolledMembers.length,
+                enrolledMembers: enrolledMembers.map((member) => ({
+                    _id: member._id,
+                    firstName: member.firstName,
+                    lastName: member.lastName,
+                    email: member.email,
+                })),
+            },
+        });
+    } catch (error) {
+        console.error("❌ Erreur lors de la récupération du nombre d'inscriptions:", error);
+        res.status(500).json({
+            success: false,
+            message: "Erreur lors de la récupération du nombre d'inscriptions",
         });
     }
 };

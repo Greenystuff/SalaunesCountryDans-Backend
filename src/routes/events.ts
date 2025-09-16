@@ -13,6 +13,7 @@ import {
     getRecurringEvents,
     getEventsByType,
     getEventsForSelection,
+    getEventEnrollmentCount,
 } from '../controllers/eventController';
 
 const router = express.Router();
@@ -31,6 +32,7 @@ router.get('/type/:type', getEventsByType);
 router.use(authenticateToken);
 
 router.get('/:id', getEventById);
+router.get('/:id/enrollment-count', getEventEnrollmentCount);
 router.post('/', createEvent);
 router.put('/:id', updateEvent);
 router.delete('/:id', deleteEvent);
