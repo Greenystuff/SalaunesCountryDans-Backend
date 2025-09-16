@@ -181,7 +181,7 @@ async function notifyManagersOfNewPreRegistration(member: any) {
                         memberInfo: memberInfo,
                         actionType: 'new_pre_registration',
                     },
-                    actionUrl: `/members/${member._id}`,
+                    actionUrl: `/members?view=${member._id.toString()}`,
                     actionText: 'Voir le profil',
                     sendRealTime: true,
                 });

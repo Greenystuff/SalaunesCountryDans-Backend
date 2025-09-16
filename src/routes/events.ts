@@ -12,6 +12,7 @@ import {
     getEventStats,
     getRecurringEvents,
     getEventsByType,
+    getEventsForSelection,
 } from '../controllers/eventController';
 
 const router = express.Router();
@@ -19,6 +20,7 @@ const router = express.Router();
 // Routes publiques
 router.get('/', getAllEvents);
 router.get('/upcoming', getUpcomingEvents);
+router.get('/for-selection', getEventsForSelection);
 router.get('/date/:date', getEventsByDate);
 router.get('/search', searchEvents);
 router.get('/stats', getEventStats);

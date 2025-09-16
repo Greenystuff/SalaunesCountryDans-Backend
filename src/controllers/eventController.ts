@@ -575,3 +575,25 @@ export const getEventsByType = async (req: Request, res: Response) => {
         });
     }
 };
+
+// Récupérer les événements pour la sélection (futurs + récurrents)
+export const getEventsForSelection = async (req: Request, res: Response) => {
+    try {
+        const limit = parseInt(req.query.limit as string) || 1000;
+        const events = await Event.findForSelection(limit);
+
+        // Formater les événements pour la réponse
+        const formattedEvents = events.map((event) => formatEventForResponse(event));
+
+        res.json({
+            success: true,
+            data: formattedEvents,
+        });
+    } catch (error) {
+        console.error('❌ Erreur lors de la récupération des événements pour sélection:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la récupération des événements pour sélection',
+        });
+    }
+};

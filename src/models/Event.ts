@@ -133,6 +133,7 @@ interface IEventModel extends mongoose.Model<IEvent> {
     findByDate(date: Date): Promise<IEvent[]>;
     findUpcoming(limit?: number): Promise<IEvent[]>;
     findByType(type: string): Promise<IEvent[]>;
+    findForSelection(limit?: number): Promise<IEvent[]>;
 }
 
 // Méthode statique pour récupérer les événements d'une date spécifique
@@ -161,6 +162,23 @@ eventSchema.statics.findUpcoming = function (limit = 20) {
 // Méthode statique pour récupérer les événements par type
 eventSchema.statics.findByType = function (type: string) {
     return this.find({ type }).sort({ start: 1 });
+};
+
+// Méthode statique pour récupérer les événements pour la sélection
+// (événements futurs + événements récurrents même avec date d'origine passée)
+eventSchema.statics.findForSelection = function (limit = 1000) {
+    const now = new Date();
+
+    return this.find({
+        $or: [
+            // Événements futurs (ponctuels et récurrents)
+            { end: { $gte: now } },
+            // Événements récurrents (même avec date d'origine passée)
+            { recurrence: { $ne: 'Aucune' } },
+        ],
+    })
+        .sort({ start: 1 })
+        .limit(limit);
 };
 
 export const Event = mongoose.model<IEvent, IEventModel>('Event', eventSchema) as IEventModel;

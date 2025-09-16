@@ -214,15 +214,7 @@ const memberSchema = new Schema<IMember>(
         },
         intendedTrialDate: {
             type: Date,
-            validate: {
-                validator: function (this: IMember, trialDate: Date) {
-                    if (!trialDate) return true; // Nullable
-                    // Comparer avec l'heure actuelle pour permettre les événements du jour même
-                    const now = new Date();
-                    return trialDate >= now; // Doit être dans le futur (avec l'heure)
-                },
-                message: "La date d'essai prévue doit être dans le futur",
-            },
+            // Pas de validation - peut être dans le passé (membre déjà venu au club)
         },
         checkDeposits: [checkDepositSchema],
     },
