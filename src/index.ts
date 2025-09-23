@@ -94,6 +94,19 @@ app.use('/internal-rules', internalRulesRoutes);
 app.use('/generate-pdf', pdfRoutes);
 app.use('/', paymentRoutes);
 
+// Route robots.txt pour éviter les erreurs 401 de Google
+app.get('/robots.txt', (req, res) => {
+    const robotsContent = `User-agent: *
+Disallow: /
+
+# API non destinée à l'indexation
+# Sitemap principal: https://salaunescountrydans.fr/sitemap.xml`;
+
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.status(200).send(robotsContent);
+});
+
 // Route de santé
 app.get('/health', (req, res) => {
     res.status(200).json({
