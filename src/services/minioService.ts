@@ -81,6 +81,9 @@ class MinioService {
         // Forcer la mise à jour de la politique pour s'assurer que robots.txt est accessible
         await this.updateBucketPolicy();
 
+        // Vérifier que le fichier robots.txt est accessible
+        await this.verifyRobotsTxtAccess();
+
         // Créer le bucket gallery s'il n'existe pas
         try {
             const galleryBucketName = 'gallery';
@@ -340,25 +343,21 @@ Sitemap: https://salaunescountrydans.fr/sitemap.xml`;
 
             const buffer = Buffer.from(robotsContent, 'utf-8');
 
-            // Vérifier si le fichier existe déjà
+            // Supprimer le fichier existant s'il existe (pour forcer la recréation avec les bonnes permissions)
             try {
-                await this.client.statObject(this.bucketName, 'robots.txt');
-                console.log(`✅ Fichier robots.txt existe déjà`);
-
-                // Mettre à jour le fichier existant pour s'assurer qu'il est accessible
-                await this.client.putObject(this.bucketName, 'robots.txt', buffer, {
-                    'Content-Type': 'text/plain',
-                    'Cache-Control': 'public, max-age=3600',
-                });
-                console.log(`✅ Fichier robots.txt mis à jour`);
+                await this.client.removeObject(this.bucketName, 'robots.txt');
+                console.log(`🗑️ Ancien fichier robots.txt supprimé`);
             } catch (error) {
-                // Le fichier n'existe pas, le créer
-                await this.client.putObject(this.bucketName, 'robots.txt', buffer, {
-                    'Content-Type': 'text/plain',
-                    'Cache-Control': 'public, max-age=3600',
-                });
-                console.log(`✅ Fichier robots.txt créé pour le sous-domaine`);
+                // Le fichier n'existait pas, c'est normal
+                console.log(`ℹ️ Aucun ancien fichier robots.txt à supprimer`);
             }
+
+            // Créer le nouveau fichier avec les bonnes permissions
+            await this.client.putObject(this.bucketName, 'robots.txt', buffer, {
+                'Content-Type': 'text/plain',
+                'Cache-Control': 'public, max-age=3600',
+            });
+            console.log(`✅ Fichier robots.txt créé avec les bonnes permissions`);
         } catch (error) {
             console.error('❌ Erreur lors de la création du fichier robots.txt:', error);
         }
@@ -388,6 +387,30 @@ Sitemap: https://salaunescountrydans.fr/sitemap.xml`;
             console.log(`✅ Politique du bucket mise à jour pour robots.txt`);
         } catch (error) {
             console.error('❌ Erreur lors de la mise à jour de la politique du bucket:', error);
+        }
+    }
+
+    /**
+     * Vérifie que le fichier robots.txt est accessible publiquement
+     */
+    private async verifyRobotsTxtAccess() {
+        try {
+            // Tenter d'accéder au fichier robots.txt
+            const stats = await this.client.statObject(this.bucketName, 'robots.txt');
+            console.log(`✅ Fichier robots.txt accessible - Taille: ${stats.size} bytes`);
+
+            // Tenter de lire le contenu
+            const stream = await this.client.getObject(this.bucketName, 'robots.txt');
+            let content = '';
+            stream.on('data', (chunk) => {
+                content += chunk.toString();
+            });
+
+            stream.on('end', () => {
+                console.log(`✅ Contenu du robots.txt vérifié (${content.length} caractères)`);
+            });
+        } catch (error) {
+            console.error('❌ Erreur lors de la vérification du fichier robots.txt:', error);
         }
     }
 }
