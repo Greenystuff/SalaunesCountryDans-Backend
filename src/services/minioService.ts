@@ -69,6 +69,9 @@ class MinioService {
             console.error("❌ Erreur lors de l'initialisation du bucket MinIO:", error);
         }
 
+        // Créer le fichier robots.txt pour le sous-domaine
+        await this.createRobotsTxt();
+
         // Créer le bucket gallery s'il n'existe pas
         try {
             const galleryBucketName = 'gallery';
@@ -228,7 +231,12 @@ class MinioService {
      */
     getPublicUrl(bucketName: string, fileName: string): string {
         const endpoint = process.env.MINIO_EXTERNAL_ENDPOINT || 'localhost:9000';
-        const protocol = process.env.MINIO_USE_SSL === 'true' ? 'https' : 'http';
+        // Utiliser HTTPS pour le domaine de production
+        const protocol = endpoint.includes('salaunescountrydans.fr')
+            ? 'https'
+            : process.env.MINIO_USE_SSL === 'true'
+            ? 'https'
+            : 'http';
         return `${protocol}://${endpoint}/${bucketName}/${fileName}`;
     }
 
@@ -306,6 +314,37 @@ class MinioService {
         } catch (error) {
             console.error(`❌ Erreur lors de la récupération des infos pour ${fileName}:`, error);
             return null;
+        }
+    }
+
+    /**
+     * Crée le fichier robots.txt pour le sous-domaine des fichiers
+     */
+    private async createRobotsTxt() {
+        try {
+            const robotsContent = `User-agent: *
+Allow: /pdfs/
+Disallow: /
+
+# Sitemap pour les fichiers
+Sitemap: https://salaunescountrydans.fr/sitemap.xml`;
+
+            const buffer = Buffer.from(robotsContent, 'utf-8');
+
+            // Vérifier si le fichier existe déjà
+            try {
+                await this.client.statObject(this.bucketName, 'robots.txt');
+                console.log(`✅ Fichier robots.txt existe déjà`);
+            } catch (error) {
+                // Le fichier n'existe pas, le créer
+                await this.client.putObject(this.bucketName, 'robots.txt', buffer, {
+                    'Content-Type': 'text/plain',
+                    'Cache-Control': 'public, max-age=3600',
+                });
+                console.log(`✅ Fichier robots.txt créé pour le sous-domaine`);
+            }
+        } catch (error) {
+            console.error('❌ Erreur lors de la création du fichier robots.txt:', error);
         }
     }
 }
