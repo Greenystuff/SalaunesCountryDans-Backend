@@ -79,8 +79,8 @@ class MinioService {
             console.error("❌ Erreur lors de l'initialisation du bucket MinIO:", error);
         }
 
-        // Créer le fichier robots.txt pour le sous-domaine (à la racine du domaine)
-        await this.createRootRobotsTxt();
+        // Configurer le Static Website Hosting et créer robots.txt
+        await this.setupStaticWebsiteHosting();
 
         // Forcer la mise à jour de la politique pour s'assurer que robots.txt est accessible
         await this.updateBucketPolicy();
@@ -340,31 +340,22 @@ class MinioService {
     }
 
     /**
-     * Crée le fichier robots.txt à la racine du domaine (Virtual Hosted-Style)
+     * Configure le Static Website Hosting et crée le fichier robots.txt
      */
-    private async createRootRobotsTxt() {
+    private async setupStaticWebsiteHosting() {
         try {
-            const robotsContent = `User-agent: *
-Allow: /pdfs/
-Disallow: /
-
-# Sitemap pour les fichiers
-Sitemap: https://salaunescountrydans.fr/sitemap.xml`;
-
-            const buffer = Buffer.from(robotsContent, 'utf-8');
-
-            // Créer un bucket spécial pour les fichiers racine
-            const rootBucketName = 'files.salaunescountrydans.fr';
+            // Créer un bucket avec le nom du domaine pour le Virtual Hosted-Style
+            const websiteBucketName = 'files.salaunescountrydans.fr';
 
             try {
-                const rootBucketExists = await this.client.bucketExists(rootBucketName);
-                if (!rootBucketExists) {
-                    await this.client.makeBucket(rootBucketName, 'us-east-1');
-                    console.log(`✅ Bucket racine '${rootBucketName}' créé avec succès`);
+                const websiteBucketExists = await this.client.bucketExists(websiteBucketName);
+                if (!websiteBucketExists) {
+                    await this.client.makeBucket(websiteBucketName, 'us-east-1');
+                    console.log(`✅ Bucket site web '${websiteBucketName}' créé avec succès`);
                 }
 
-                // Configurer la politique publique pour le bucket racine
-                const rootPolicy = {
+                // Configurer la politique publique pour le bucket site web
+                const websitePolicy = {
                     Version: '2012-10-17',
                     Statement: [
                         {
@@ -373,35 +364,51 @@ Sitemap: https://salaunescountrydans.fr/sitemap.xml`;
                                 AWS: ['*'],
                             },
                             Action: ['s3:GetObject'],
-                            Resource: [`arn:aws:s3:::${rootBucketName}/*`],
+                            Resource: [`arn:aws:s3:::${websiteBucketName}/*`],
                         },
                     ],
                 };
 
-                await this.client.setBucketPolicy(rootBucketName, JSON.stringify(rootPolicy));
+                await this.client.setBucketPolicy(websiteBucketName, JSON.stringify(websitePolicy));
                 console.log(
-                    `✅ Politique publique configurée pour le bucket racine '${rootBucketName}'`
+                    `✅ Politique publique configurée pour le bucket site web '${websiteBucketName}'`
                 );
+
+                // Créer le fichier robots.txt
+                const robotsContent = `User-agent: *
+Allow: /pdfs/
+Allow: /gallery/
+Allow: /documents/
+Disallow: /
+
+# Sitemap pour les fichiers
+Sitemap: https://salaunescountrydans.fr/sitemap.xml`;
+
+                const buffer = Buffer.from(robotsContent, 'utf-8');
 
                 // Supprimer l'ancien fichier robots.txt s'il existe
                 try {
-                    await this.client.removeObject(rootBucketName, 'robots.txt');
-                    console.log(`🗑️ Ancien fichier robots.txt supprimé du bucket racine`);
+                    await this.client.removeObject(websiteBucketName, 'robots.txt');
+                    console.log(`🗑️ Ancien fichier robots.txt supprimé du bucket site web`);
                 } catch (error) {
-                    console.log(`ℹ️ Aucun ancien fichier robots.txt à supprimer du bucket racine`);
+                    console.log(
+                        `ℹ️ Aucun ancien fichier robots.txt à supprimer du bucket site web`
+                    );
                 }
 
-                // Créer le nouveau fichier robots.txt dans le bucket racine
-                await this.client.putObject(rootBucketName, 'robots.txt', buffer, {
+                // Créer le nouveau fichier robots.txt
+                await this.client.putObject(websiteBucketName, 'robots.txt', buffer, {
                     'Content-Type': 'text/plain',
                     'Cache-Control': 'public, max-age=3600',
                 });
-                console.log(`✅ Fichier robots.txt créé dans le bucket racine '${rootBucketName}'`);
+                console.log(
+                    `✅ Fichier robots.txt créé dans le bucket site web '${websiteBucketName}'`
+                );
             } catch (error) {
-                console.error('❌ Erreur lors de la création du bucket racine:', error);
+                console.error('❌ Erreur lors de la configuration du bucket site web:', error);
             }
         } catch (error) {
-            console.error('❌ Erreur lors de la création du fichier robots.txt racine:', error);
+            console.error('❌ Erreur lors de la configuration du Static Website Hosting:', error);
         }
     }
 
@@ -492,7 +499,7 @@ Sitemap: https://salaunescountrydans.fr/sitemap.xml`;
      */
     private async testRobotsTxtUrl() {
         try {
-            // Tester l'URL racine (Virtual Hosted-Style)
+            // Tester l'URL racine (ce que Google cherche)
             const rootUrl = 'https://files.salaunescountrydans.fr/robots.txt';
             console.log(`🔗 URL racine du robots.txt: ${rootUrl}`);
 
@@ -511,9 +518,9 @@ Sitemap: https://salaunescountrydans.fr/sitemap.xml`;
                 );
             }
 
-            // Tester aussi l'URL du bucket (pour comparaison)
-            const bucketUrl = this.getPublicUrl(this.bucketName, 'robots.txt');
-            console.log(`🔗 URL bucket du robots.txt: ${bucketUrl}`);
+            // Tester aussi l'URL du bucket domaine
+            const domainUrl = this.getPublicUrl('files.salaunescountrydans.fr', 'robots.txt');
+            console.log(`🔗 URL bucket domaine du robots.txt: ${domainUrl}`);
         } catch (error) {
             console.error("❌ Erreur lors du test de l'URL publique:", error);
         }
