@@ -27,15 +27,18 @@ class MinioService {
                 await this.client.makeBucket(this.bucketName, 'us-east-1');
                 console.log(`✅ Bucket '${this.bucketName}' créé avec succès`);
 
-                // Configurer la politique publique pour les PDFs
+                // Configurer la politique publique pour les PDFs et robots.txt
                 const policy = {
                     Version: '2012-10-17',
                     Statement: [
                         {
                             Effect: 'Allow',
-                            Principal: { AWS: ['*'] },
+                            Principal: '*',
                             Action: ['s3:GetObject'],
-                            Resource: [`arn:aws:s3:::${this.bucketName}/*`],
+                            Resource: [
+                                `arn:aws:s3:::${this.bucketName}/*`,
+                                `arn:aws:s3:::${this.bucketName}/robots.txt`,
+                            ],
                         },
                     ],
                 };
@@ -50,9 +53,12 @@ class MinioService {
                         Statement: [
                             {
                                 Effect: 'Allow',
-                                Principal: { AWS: ['*'] },
+                                Principal: '*',
                                 Action: ['s3:GetObject'],
-                                Resource: [`arn:aws:s3:::${this.bucketName}/*`],
+                                Resource: [
+                                    `arn:aws:s3:::${this.bucketName}/*`,
+                                    `arn:aws:s3:::${this.bucketName}/robots.txt`,
+                                ],
                             },
                         ],
                     };
@@ -71,6 +77,9 @@ class MinioService {
 
         // Créer le fichier robots.txt pour le sous-domaine
         await this.createRobotsTxt();
+
+        // Forcer la mise à jour de la politique pour s'assurer que robots.txt est accessible
+        await this.updateBucketPolicy();
 
         // Créer le bucket gallery s'il n'existe pas
         try {
@@ -335,6 +344,13 @@ Sitemap: https://salaunescountrydans.fr/sitemap.xml`;
             try {
                 await this.client.statObject(this.bucketName, 'robots.txt');
                 console.log(`✅ Fichier robots.txt existe déjà`);
+
+                // Mettre à jour le fichier existant pour s'assurer qu'il est accessible
+                await this.client.putObject(this.bucketName, 'robots.txt', buffer, {
+                    'Content-Type': 'text/plain',
+                    'Cache-Control': 'public, max-age=3600',
+                });
+                console.log(`✅ Fichier robots.txt mis à jour`);
             } catch (error) {
                 // Le fichier n'existe pas, le créer
                 await this.client.putObject(this.bucketName, 'robots.txt', buffer, {
@@ -345,6 +361,33 @@ Sitemap: https://salaunescountrydans.fr/sitemap.xml`;
             }
         } catch (error) {
             console.error('❌ Erreur lors de la création du fichier robots.txt:', error);
+        }
+    }
+
+    /**
+     * Met à jour la politique du bucket pour s'assurer que robots.txt est accessible
+     */
+    private async updateBucketPolicy() {
+        try {
+            const policy = {
+                Version: '2012-10-17',
+                Statement: [
+                    {
+                        Effect: 'Allow',
+                        Principal: '*',
+                        Action: ['s3:GetObject'],
+                        Resource: [
+                            `arn:aws:s3:::${this.bucketName}/*`,
+                            `arn:aws:s3:::${this.bucketName}/robots.txt`,
+                        ],
+                    },
+                ],
+            };
+
+            await this.client.setBucketPolicy(this.bucketName, JSON.stringify(policy));
+            console.log(`✅ Politique du bucket mise à jour pour robots.txt`);
+        } catch (error) {
+            console.error('❌ Erreur lors de la mise à jour de la politique du bucket:', error);
         }
     }
 }
