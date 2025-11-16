@@ -237,13 +237,17 @@ class MinioService {
      * Génère une URL publique directe (sans signature)
      */
     getPublicUrl(bucketName: string, fileName: string): string {
+        // En mode développement, utiliser l'endpoint local
+        if (process.env.NODE_ENV !== 'production') {
+            const localEndpoint = process.env.MINIO_ENDPOINT || 'localhost';
+            const localPort = process.env.MINIO_PORT || '9000';
+            const protocol = process.env.MINIO_USE_SSL === 'true' ? 'https' : 'http';
+            return `${protocol}://${localEndpoint}:${localPort}/${bucketName}/${fileName}`;
+        }
+
+        // En production, utiliser l'endpoint externe
         const endpoint = process.env.MINIO_EXTERNAL_ENDPOINT || 'localhost:9000';
-        // Utiliser HTTPS pour le domaine de production
-        const protocol = endpoint.includes('salaunescountrydans.fr')
-            ? 'https'
-            : process.env.MINIO_USE_SSL === 'true'
-            ? 'https'
-            : 'http';
+        const protocol = endpoint.includes('salaunescountrydans.fr') ? 'https' : 'http';
         return `${protocol}://${endpoint}/${bucketName}/${fileName}`;
     }
 
@@ -276,9 +280,9 @@ class MinioService {
     /**
      * Vérifie si un fichier existe
      */
-    async fileExists(fileName: string): Promise<boolean> {
+    async fileExists(bucketName: string, fileName: string): Promise<boolean> {
         try {
-            await this.client.statObject(this.bucketName, fileName);
+            await this.client.statObject(bucketName, fileName);
             return true;
         } catch (error) {
             return false;
@@ -288,10 +292,10 @@ class MinioService {
     /**
      * Liste tous les fichiers dans le bucket
      */
-    async listFiles(prefix?: string): Promise<string[]> {
+    async listFiles(bucketName: string, prefix?: string): Promise<string[]> {
         try {
             const files: string[] = [];
-            const stream = this.client.listObjects(this.bucketName, prefix, true);
+            const stream = this.client.listObjects(bucketName, prefix, true);
 
             return new Promise((resolve, reject) => {
                 stream.on('data', (obj) => {

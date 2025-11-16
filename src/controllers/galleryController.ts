@@ -81,7 +81,17 @@ export const getAllGalleryImages = async (req: Request, res: Response) => {
             images.map(async (image) => {
                 const imageObj = image.toObject();
                 try {
-                    const publicUrl = await minioService.getPublicUrl('gallery', image.imageFile);
+                    // Vérifier si le fichier existe avant de générer l'URL
+                    const fileExists = await minioService.fileExists('gallery', image.imageFile);
+                    if (!fileExists) {
+                        console.warn(`Fichier non trouvé dans MinIO: ${image.imageFile}`);
+                        return {
+                            ...imageObj,
+                            imageUrl: null,
+                        };
+                    }
+
+                    const publicUrl = minioService.getPublicUrl('gallery', image.imageFile);
                     return {
                         ...imageObj,
                         imageUrl: publicUrl,
@@ -133,8 +143,15 @@ export const getGalleryImageById = async (req: Request, res: Response) => {
         // Ajouter l'URL publique MinIO
         const imageObj = image.toObject() as any;
         try {
-            const publicUrl = await minioService.getPublicUrl('gallery', image.imageFile);
-            imageObj.imageUrl = publicUrl;
+            // Vérifier si le fichier existe avant de générer l'URL
+            const fileExists = await minioService.fileExists('gallery', image.imageFile);
+            if (!fileExists) {
+                console.warn(`Fichier non trouvé dans MinIO: ${image.imageFile}`);
+                imageObj.imageUrl = null;
+            } else {
+                const publicUrl = minioService.getPublicUrl('gallery', image.imageFile);
+                imageObj.imageUrl = publicUrl;
+            }
         } catch (error) {
             console.error(`Erreur lors de la génération de l'URL pour ${image.imageFile}:`, error);
             imageObj.imageUrl = null;
