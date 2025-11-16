@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Event, IEvent } from '../models/Event';
 import { Member } from '../models/Member';
+import EventException from '../models/EventException';
 
 // Fonction utilitaire pour parser les dates locales
 function parseLocalDate(dateString: string): Date {
@@ -122,8 +123,18 @@ export const getAllEvents = async (req: Request, res: Response) => {
 
         const total = await Event.countDocuments(query);
 
-        // Formater les événements pour la réponse
-        const formattedEvents = events.map((event) => formatEventForResponse(event));
+        // Charger les exceptions pour tous les événements récurrents
+        const recurringEventIds = events.filter(e => e.recurrence !== 'Aucune').map(e => e._id);
+        const exceptions = await EventException.find({ eventId: { $in: recurringEventIds } });
+
+        // Formater les événements pour la réponse avec leurs exceptions
+        const formattedEvents = events.map((event) => {
+            const formatted = formatEventForResponse(event);
+            if (event.recurrence !== 'Aucune') {
+                formatted.exceptions = exceptions.filter(ex => ex.eventId.toString() === event._id.toString());
+            }
+            return formatted;
+        });
 
         res.json({
             success: true,

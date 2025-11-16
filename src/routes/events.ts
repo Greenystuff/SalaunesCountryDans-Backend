@@ -15,6 +15,12 @@ import {
     getEventsForSelection,
     getEventEnrollmentCount,
 } from '../controllers/eventController';
+import {
+    createException,
+    getExceptions,
+    updateException,
+    deleteException,
+} from '../controllers/eventExceptionController';
 
 const router = express.Router();
 
@@ -36,5 +42,11 @@ router.get('/:id/enrollment-count', getEventEnrollmentCount);
 router.post('/', createEvent);
 router.put('/:id', updateEvent);
 router.delete('/:id', deleteEvent);
+
+// Routes pour les exceptions d'événements récurrents
+router.post('/:eventId/exceptions', createException);
+router.get('/:eventId/exceptions', getExceptions);
+router.put('/:eventId/exceptions/:exceptionId', updateException);
+router.delete('/:eventId/exceptions/:exceptionId', deleteException);
 
 export default router;
