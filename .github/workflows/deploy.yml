@@ -35,3 +35,6 @@ jobs:
 
             - name: Push Docker Image
               run: docker push hub.rahona.app:8443/salaunes-country-club/${{ env.IMAGE_NAME }}:latest
+
+            - name: Trigger Dokploy Deployment
+              run: curl -fsSL https://infra.codecrafted.fr/api/deploy/QMhhgeAXPixetdJMmxYYc
