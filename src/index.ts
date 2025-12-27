@@ -12,6 +12,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
 import websocketService from './services/websocketService';
 import { PdfCacheService } from './services/pdfCacheService';
+import { normalizeDatesOnStartup } from './services/dateNormalizationService';
 
 // Routes
 import authRoutes from './routes/auth';
@@ -145,6 +146,9 @@ const startServer = async () => {
 
         // Initialisation de la base de données
         await initializeDatabase();
+
+        // Normalisation automatique des dates des danses
+        await normalizeDatesOnStartup();
 
         // Initialisation du cache PDF
         console.log('📄 Initialisation du cache PDF...');

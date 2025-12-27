@@ -31,6 +31,14 @@ const DanceSchema = new Schema<IDance>(
             type: String,
             required: true,
             index: true,
+            validate: {
+                validator: function (v: string) {
+                    // Valider que la date est au format ISO (YYYY-MM-DD)
+                    return /^\d{4}-\d{2}-\d{2}$/.test(v);
+                },
+                message: (props: any) =>
+                    `${props.value} doit être au format ISO (YYYY-MM-DD) pour permettre le tri correct`,
+            },
         },
         dateDisplay: {
             type: String,
@@ -62,6 +70,16 @@ const DanceSchema = new Schema<IDance>(
 // Middleware pour automatiquement définir dateDisplay quand date est modifiée
 DanceSchema.pre('save', function (next) {
     if (this.isModified('date') && this.date) {
+        // Vérifier que la date est au format ISO
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(this.date)) {
+            return next(
+                new Error(
+                    `La date doit être au format ISO (YYYY-MM-DD), reçu: ${this.date}. ` +
+                        `Utilisez parseFrenchDate() pour convertir une date française.`
+                )
+            );
+        }
+
         // Si dateDisplay n'est pas défini, le créer à partir de la date
         if (!this.dateDisplay) {
             const dateObj = new Date(this.date);

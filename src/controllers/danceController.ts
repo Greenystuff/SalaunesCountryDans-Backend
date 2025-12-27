@@ -10,36 +10,46 @@ interface MulterRequest extends Request {
 
 /**
  * Parse une date française en date ISO
- * Ex: "10 juin 2025" -> "2025-06-10"
+ * Ex: "10 juin 2025" -> { isoDate: "2025-06-10", isValid: true }
  */
-const parseFrenchDate = (dateStr: string): string => {
+const parseFrenchDate = (dateStr: string): { isoDate: string; isValid: boolean } => {
     const months: { [key: string]: number } = {
         janvier: 1,
         février: 2,
+        fevrier: 2, // Variante sans accent
         mars: 3,
         avril: 4,
         mai: 5,
         juin: 6,
         juillet: 7,
         août: 8,
+        aout: 8, // Variante sans accent
         septembre: 9,
         octobre: 10,
         novembre: 11,
         décembre: 12,
+        decembre: 12, // Variante sans accent
     };
 
-    // Regex pour capturer "jour mois année"
-    const match = dateStr.match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
+    // Regex amélioré pour capturer les caractères accentués
+    const match = dateStr.match(/(\d{1,2})\s+([\wàâäéèêëïîôùûüÿæœç]+)\s+(\d{4})/i);
     if (match) {
         const [, day, monthName, year] = match;
         const month = months[monthName.toLowerCase()];
         if (month) {
-            return `${year}-${month.toString().padStart(2, '0')}-${day.padStart(2, '0')}`;
+            const isoDate = `${year}-${month.toString().padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+            // Valider que la date est réelle (pas de 30 février, etc.)
+            const dateObj = new Date(isoDate);
+            if (!isNaN(dateObj.getTime())) {
+                return { isoDate, isValid: true };
+            }
         }
     }
 
-    // Si on ne peut pas parser, retourner la date originale
-    return dateStr;
+    // Si on ne peut pas parser, retourner avec indicateur d'échec
+    console.warn(`⚠️ Échec du parsing de la date: "${dateStr}"`);
+    return { isoDate: dateStr, isValid: false };
 };
 
 // Configuration multer pour l'upload de fichiers
@@ -256,7 +266,16 @@ export const createDance = async (req: Request, res: Response) => {
         // Parser la date française en date ISO
         if (danceData.date) {
             const originalDate = danceData.date; // Garder la date française originale
-            danceData.date = parseFrenchDate(danceData.date);
+            const { isoDate, isValid } = parseFrenchDate(danceData.date);
+
+            if (!isValid) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Format de date invalide: "${originalDate}". Format attendu: "10 juin 2025"`,
+                });
+            }
+
+            danceData.date = isoDate;
             danceData.dateDisplay = originalDate; // Garder la date française pour l'affichage
         }
 
@@ -306,7 +325,16 @@ export const updateDance = async (req: Request, res: Response) => {
         // Parser la date française en date ISO
         if (updateData.date) {
             const originalDate = updateData.date; // Garder la date française originale
-            updateData.date = parseFrenchDate(updateData.date);
+            const { isoDate, isValid } = parseFrenchDate(updateData.date);
+
+            if (!isValid) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Format de date invalide: "${originalDate}". Format attendu: "10 juin 2025"`,
+                });
+            }
+
+            updateData.date = isoDate;
             updateData.dateDisplay = originalDate; // Garder la date française pour l'affichage
         }
 
