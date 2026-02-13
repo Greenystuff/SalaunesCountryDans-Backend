@@ -31,10 +31,16 @@ class VideoQueueService {
 
     constructor() {
         // Configurer la connexion Redis
-        this.connection = new IORedis({
-            host: process.env.REDIS_HOST || 'localhost',
-            port: parseInt(process.env.REDIS_PORT || '6379'),
-            password: process.env.REDIS_PASSWORD || undefined,
+        // Support de REDIS_URL (Dokploy) ou REDIS_HOST/PORT/PASSWORD (Docker Compose local)
+        const redisConfig: any = process.env.REDIS_URL
+            ? process.env.REDIS_URL
+            : {
+                  host: process.env.REDIS_HOST || 'localhost',
+                  port: parseInt(process.env.REDIS_PORT || '6379'),
+                  password: process.env.REDIS_PASSWORD || undefined,
+              };
+
+        this.connection = new IORedis(redisConfig, {
             maxRetriesPerRequest: null, // Requis pour BullMQ
             retryStrategy: (times: number) => {
                 const delay = Math.min(times * 50, 2000);
