@@ -1,6 +1,14 @@
 # Utiliser l'image Node.js officielle avec Alpine Linux pour une taille réduite
 FROM node:20-alpine
 
+# Installer FFmpeg pour le traitement vidéo
+RUN apk add --no-cache \
+    ffmpeg \
+    && rm -rf /var/cache/apk/*
+
+# Vérifier l'installation de FFmpeg
+RUN ffmpeg -version && ffprobe -version
+
 # Installer les dépendances pour html-pdf-node
 RUN apk add --no-cache \
     chromium \

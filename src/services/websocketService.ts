@@ -414,6 +414,25 @@ class WebSocketService {
             console.error("❌ Erreur lors de l'envoi des notifications en attente:", error);
         }
     }
+
+    /**
+     * Notifier le statut de transcoding d'une vidéo à tous les admins
+     */
+    public notifyVideoProcessing(videoId: string, data: {
+        status: 'pending' | 'processing' | 'completed' | 'failed' | 'partial';
+        progress?: number;
+        error?: string;
+        variants?: any[];
+    }): void {
+        this.broadcastToAdmins('dataUpdate', {
+            entity: 'video-processing',
+            action: 'update',
+            data: {
+                videoId,
+                ...data,
+            },
+        });
+    }
 }
 
 // Instance singleton

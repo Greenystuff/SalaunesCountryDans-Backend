@@ -13,6 +13,7 @@ import { notFound } from './middleware/notFound';
 import websocketService from './services/websocketService';
 import { PdfCacheService } from './services/pdfCacheService';
 import { normalizeDatesOnStartup } from './services/dateNormalizationService';
+import videoQueueService from './services/videoQueueService';
 
 // Routes
 import authRoutes from './routes/auth';
@@ -150,10 +151,32 @@ const startServer = async () => {
         // Normalisation automatique des dates des danses
         await normalizeDatesOnStartup();
 
+        // Migration automatique des médias existants (ajouter mediaType si manquant)
+        console.log('🔄 Vérification et migration des médias existants...');
+        try {
+            const Gallery = (await import('./models/Gallery')).default;
+            const result = await Gallery.updateMany(
+                { mediaType: { $exists: false } },
+                { $set: { mediaType: 'image' } }
+            );
+            if (result.modifiedCount > 0) {
+                console.log(`✅ ${result.modifiedCount} images existantes migrées avec mediaType='image'`);
+            } else {
+                console.log('✅ Tous les médias ont déjà le champ mediaType');
+            }
+        } catch (error) {
+            console.error('❌ Erreur lors de la migration des médias:', error);
+        }
+
         // Initialisation du cache PDF
         console.log('📄 Initialisation du cache PDF...');
         const pdfCache = PdfCacheService.getInstance();
         await pdfCache.generateInscriptionFormPdf();
+
+        // Initialisation du service de queue vidéo
+        console.log('🎬 Initialisation du service de traitement vidéo...');
+        // Le service est déjà initialisé lors de l'import, on log juste pour confirmer
+        console.log('✅ Service de queue vidéo prêt');
 
         server.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Serveur HTTP démarré sur 0.0.0.0:${PORT}`);
@@ -178,5 +201,18 @@ const startServer = async () => {
 };
 
 startServer();
+
+// Gestion de l'arrêt propre du serveur
+process.on('SIGTERM', async () => {
+    console.log('⚠️ SIGTERM reçu, arrêt propre du serveur...');
+    await videoQueueService.close();
+    process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+    console.log('⚠️ SIGINT reçu, arrêt propre du serveur...');
+    await videoQueueService.close();
+    process.exit(0);
+});
 
 export default app;

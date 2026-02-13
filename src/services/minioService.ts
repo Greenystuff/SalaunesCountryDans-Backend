@@ -234,6 +234,122 @@ class MinioService {
     }
 
     /**
+     * Génère le chemin pour un fichier vidéo original
+     */
+    getVideoOriginalPath(videoId: string, extension: string = '.mp4'): string {
+        return `videos/originals/${videoId}${extension}`;
+    }
+
+    /**
+     * Génère le chemin pour une thumbnail vidéo
+     */
+    getVideoThumbnailPath(videoId: string): string {
+        return `videos/thumbnails/${videoId}-thumb.jpg`;
+    }
+
+    /**
+     * Génère le chemin pour une vidéo transcodée
+     */
+    getVideoTranscodedPath(videoId: string, resolution: '480p' | '720p' | '1080p'): string {
+        return `videos/transcoded/${videoId}-${resolution}.mp4`;
+    }
+
+    /**
+     * Génère le chemin pour un manifest HLS
+     */
+    getVideoHlsManifestPath(videoId: string, resolution: '480p' | '720p' | '1080p'): string {
+        return `videos/hls/${videoId}/${resolution}.m3u8`;
+    }
+
+    /**
+     * Génère le chemin pour un master manifest HLS
+     */
+    getVideoHlsMasterManifestPath(videoId: string): string {
+        return `videos/hls/${videoId}/master.m3u8`;
+    }
+
+    /**
+     * Génère le chemin pour un segment HLS
+     */
+    getVideoHlsSegmentPath(
+        videoId: string,
+        resolution: '480p' | '720p' | '1080p',
+        segmentIndex: number
+    ): string {
+        return `videos/hls/${videoId}/segments/${resolution}_${segmentIndex.toString().padStart(3, '0')}.ts`;
+    }
+
+    /**
+     * Upload un fichier vidéo vers MinIO
+     */
+    async uploadVideoFile(
+        fileName: string,
+        buffer: Buffer,
+        contentType: string = 'video/mp4'
+    ): Promise<boolean> {
+        return this.uploadFile('gallery', fileName, buffer, contentType);
+    }
+
+    /**
+     * Obtient l'URL publique d'une vidéo
+     */
+    getVideoUrl(fileName: string): string {
+        return this.getPublicUrl('gallery', fileName);
+    }
+
+    /**
+     * Télécharge un fichier vidéo depuis MinIO vers un fichier temporaire local
+     */
+    async downloadVideoFile(fileName: string, destinationPath: string): Promise<boolean> {
+        try {
+            console.log(`📥 Téléchargement de ${fileName} depuis MinIO...`);
+
+            await this.client.fGetObject('gallery', fileName, destinationPath);
+
+            console.log(`✅ Vidéo téléchargée vers ${destinationPath}`);
+            return true;
+        } catch (error) {
+            console.error(`❌ Erreur lors du téléchargement de ${fileName}:`, error);
+            return false;
+        }
+    }
+
+    /**
+     * Supprime tous les fichiers vidéo associés à un ID
+     */
+    async deleteVideoFiles(videoId: string): Promise<boolean> {
+        try {
+            // Lister tous les fichiers du dossier vidéo
+            const videoPrefix = `videos/`;
+            const files = await this.listFiles('gallery', videoPrefix);
+
+            // Filtrer les fichiers contenant l'ID vidéo
+            const videoFiles = files.filter((file) => file.includes(videoId));
+
+            // Supprimer chaque fichier
+            const deletePromises = videoFiles.map((file) => this.deleteFile('gallery', file));
+            const results = await Promise.all(deletePromises);
+
+            // Vérifier que tous les fichiers ont été supprimés
+            const allDeleted = results.every((result) => result === true);
+
+            if (allDeleted) {
+                console.log(`✅ Tous les fichiers vidéo supprimés pour ${videoId}`);
+            } else {
+                console.warn(`⚠️ Certains fichiers vidéo n'ont pas pu être supprimés pour ${videoId}`);
+            }
+
+            return allDeleted;
+        } catch (error) {
+            console.error(
+                `❌ Erreur lors de la suppression des fichiers vidéo pour ${videoId}:`,
+                error
+            );
+            return false;
+        }
+    }
+
+    /**
      * Génère une URL publique directe (sans signature)
      */
     getPublicUrl(bucketName: string, fileName: string): string {
