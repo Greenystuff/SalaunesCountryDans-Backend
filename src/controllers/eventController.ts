@@ -2,22 +2,11 @@ import { Request, Response } from 'express';
 import { Event, IEvent } from '../models/Event';
 import { Member } from '../models/Member';
 import EventException from '../models/EventException';
-
-// Fonction utilitaire pour parser les dates locales
-function parseLocalDate(dateString: string): Date {
-    // Si c'est au format ISO sans Z, l'interpréter comme locale
-    if (dateString.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?$/)) {
-        const [datePart, timePart] = dateString.split('T');
-        const [year, month, day] = datePart.split('-').map(Number);
-        const [time, ms] = timePart.split('.');
-        const [hours, minutes, seconds] = time.split(':').map(Number);
-
-        // Créer une date locale
-        return new Date(year, month - 1, day, hours, minutes, seconds || 0);
-    }
-    // Fallback pour les autres formats
-    return new Date(dateString);
-}
+import {
+    parseLocalDate,
+    toNaiveLocalString,
+    formatExceptionForResponse,
+} from '../utils/eventDates';
 
 // Fonction utilitaire pour formater les dates en local pour la réponse
 function formatEventForResponse(event: any): any {
@@ -25,30 +14,11 @@ function formatEventForResponse(event: any): any {
 
     // Formater les dates en local (sans Z)
     if (eventObj.start) {
-        const startDate = new Date(eventObj.start);
-        eventObj.start = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(
-            2,
-            '0'
-        )}-${String(startDate.getDate()).padStart(2, '0')}T${String(startDate.getHours()).padStart(
-            2,
-            '0'
-        )}:${String(startDate.getMinutes()).padStart(2, '0')}:${String(
-            startDate.getSeconds()
-        ).padStart(2, '0')}.000`;
+        eventObj.start = toNaiveLocalString(eventObj.start);
     }
 
     if (eventObj.end) {
-        const endDate = new Date(eventObj.end);
-        eventObj.end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(
-            2,
-            '0'
-        )}-${String(endDate.getDate()).padStart(2, '0')}T${String(endDate.getHours()).padStart(
-            2,
-            '0'
-        )}:${String(endDate.getMinutes()).padStart(2, '0')}:${String(endDate.getSeconds()).padStart(
-            2,
-            '0'
-        )}.000`;
+        eventObj.end = toNaiveLocalString(eventObj.end);
     }
 
     return eventObj;
@@ -131,7 +101,9 @@ export const getAllEvents = async (req: Request, res: Response) => {
         const formattedEvents = events.map((event) => {
             const formatted = formatEventForResponse(event);
             if (event.recurrence !== 'Aucune') {
-                formatted.exceptions = exceptions.filter(ex => ex.eventId.toString() === event._id.toString());
+                formatted.exceptions = exceptions
+                    .filter(ex => ex.eventId.toString() === event._id.toString())
+                    .map(formatExceptionForResponse);
             }
             return formatted;
         });
