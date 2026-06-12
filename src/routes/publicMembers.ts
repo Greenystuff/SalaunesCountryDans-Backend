@@ -3,12 +3,13 @@ import {
     publicRegister,
     checkEmailExists,
     getPublicStats,
+    uploadMemberPhotoMiddleware,
 } from '../controllers/publicMemberController';
 
 const router = express.Router();
 
 // Routes publiques pour l'inscription en ligne
-router.post('/register', publicRegister);
+router.post('/register', uploadMemberPhotoMiddleware, publicRegister);
 router.get('/check-email/:email', checkEmailExists);
 router.get('/stats', getPublicStats);
 

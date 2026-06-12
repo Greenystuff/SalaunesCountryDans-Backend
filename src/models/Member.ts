@@ -28,6 +28,7 @@ export interface IMember extends Document {
     mobilePhone?: string;
     email: string;
     imageRights: boolean;
+    photoUrl?: string;
     enrolledEvents: IEventEnrollment[];
     status: 'pré-inscrit' | 'inscrit' | 'actif' | 'inactif';
 
@@ -189,6 +190,10 @@ const memberSchema = new Schema<IMember>(
             type: Boolean,
             required: [true, "Le droit à l'image est requis"],
             default: false,
+        },
+        photoUrl: {
+            type: String,
+            trim: true,
         },
         enrolledEvents: [eventEnrollmentSchema],
         status: {
