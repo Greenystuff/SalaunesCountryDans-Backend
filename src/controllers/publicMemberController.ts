@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import multer from 'multer';
 import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
@@ -44,7 +45,62 @@ export const uploadMemberPhotoMiddleware = (
     });
 };
 
-// Inscription publique d'un nouveau membre
+// Applique les inscriptions entrantes à un membre existant, sans doublon.
+// Réutilise la déduplication de Member.enrollInEvent (récurrent / ponctuel / toutes occurrences).
+async function mergeIncomingEnrollments(member: any, incomingEnrollments: any[]) {
+    for (const enrollment of incomingEnrollments) {
+        if (!enrollment?.eventId) continue;
+        await member.enrollInEvent(
+            new mongoose.Types.ObjectId(enrollment.eventId),
+            !!enrollment.isRecurring,
+            enrollment.occurrenceDate ? new Date(enrollment.occurrenceDate) : undefined,
+            !!enrollment.isAllOccurrences,
+            enrollment.trialDate ? new Date(enrollment.trialDate) : undefined
+        );
+    }
+}
+
+// Optimise et envoie la photo de pré-inscription vers MinIO (optionnelle).
+// En cas de renouvellement, on ne remplace pas une photo déjà présente.
+async function handleMemberPhoto(
+    member: any,
+    file: Express.Multer.File | undefined,
+    isRenewal: boolean
+) {
+    if (!file || (isRenewal && member.photoUrl)) {
+        return;
+    }
+
+    try {
+        const optimized = await sharp(file.buffer)
+            .rotate() // respecte l'orientation EXIF
+            .resize(512, 512, { fit: 'cover', position: 'centre' })
+            .webp({ quality: 82 }) // supprime les métadonnées (dont GPS) par défaut
+            .toBuffer();
+
+        const fileName = `member-photos/${member._id.toString()}-${uuidv4()}.webp`;
+        const uploadSuccess = await minioService.uploadFile(
+            'gallery',
+            fileName,
+            optimized,
+            'image/webp'
+        );
+
+        if (uploadSuccess) {
+            member.photoUrl = minioService.getPublicUrl('gallery', fileName);
+            await member.save();
+        }
+    } catch (photoError) {
+        console.error("❌ Erreur lors de l'upload de la photo de pré-inscription:", photoError);
+        // On continue : la photo est optionnelle
+    }
+}
+
+// Inscription publique d'un membre.
+// - Email inconnu → création d'une nouvelle pré-inscription.
+// - Email déjà présent (ex. membre d'une saison précédente) → renouvellement :
+//   on enrichit la fiche existante du nouvel événement + date d'essai, SANS écraser
+//   ses coordonnées (celles-ci ne sont modifiables que par l'admin).
 export const publicRegister = async (req: Request, res: Response) => {
     try {
         const memberData = req.body;
@@ -65,18 +121,15 @@ export const publicRegister = async (req: Request, res: Response) => {
         delete memberData.photo;
         delete memberData.photoUrl;
 
-        // Vérifier si l'email existe déjà
-        const existingMember = await Member.findOne({ email: memberData.email });
-        if (existingMember) {
-            return res.status(400).json({
-                success: false,
-                message: 'Un membre avec cet email existe déjà',
-            });
-        }
+        // Email normalisé (le schéma stocke déjà en minuscules) pour retrouver une fiche existante
+        const email = (memberData.email || '').toLowerCase().trim();
 
         // Vérifier que les événements existent si fournis
-        if (memberData.enrolledEvents && memberData.enrolledEvents.length > 0) {
-            const eventIds = memberData.enrolledEvents.map((enrollment: any) => enrollment.eventId);
+        const incomingEnrollments: any[] = Array.isArray(memberData.enrolledEvents)
+            ? memberData.enrolledEvents
+            : [];
+        if (incomingEnrollments.length > 0) {
+            const eventIds = incomingEnrollments.map((enrollment: any) => enrollment.eventId);
             const events = await Event.find({ _id: { $in: eventIds } });
             if (events.length !== eventIds.length) {
                 return res.status(400).json({
@@ -86,59 +139,52 @@ export const publicRegister = async (req: Request, res: Response) => {
             }
         }
 
-        // Créer le membre avec le statut "pré-inscrit"
-        const member = new Member({
-            ...memberData,
-            status: 'pré-inscrit',
-            // Les champs admin restent vides
-            registrationDate: undefined,
-            annualFeePaymentMethod: undefined,
-            membershipPaymentMethod: undefined,
-            checkDeposits: [],
-        });
+        const existingMember = await Member.findOne({ email });
+        const isRenewal = !!existingMember;
+        let member;
 
-        await member.save();
+        if (existingMember) {
+            // Renouvellement : on n'ajoute que le nouvel événement et la date d'essai.
+            await mergeIncomingEnrollments(existingMember, incomingEnrollments);
 
-        // Si une photo a été fournie, l'optimiser puis l'uploader vers MinIO.
-        // La photo est optionnelle : en cas d'échec, la pré-inscription reste valide.
-        if (req.file) {
-            try {
-                const optimized = await sharp(req.file.buffer)
-                    .rotate() // respecte l'orientation EXIF
-                    .resize(512, 512, { fit: 'cover', position: 'centre' })
-                    .webp({ quality: 82 }) // supprime les métadonnées (dont GPS) par défaut
-                    .toBuffer();
-
-                const fileName = `member-photos/${member._id}-${uuidv4()}.webp`;
-                const uploadSuccess = await minioService.uploadFile(
-                    'gallery',
-                    fileName,
-                    optimized,
-                    'image/webp'
-                );
-
-                if (uploadSuccess) {
-                    member.photoUrl = minioService.getPublicUrl('gallery', fileName);
-                    await member.save();
-                }
-            } catch (photoError) {
-                console.error("❌ Erreur lors de l'upload de la photo de pré-inscription:", photoError);
-                // On continue : la photo est optionnelle
+            if (memberData.intendedTrialDate) {
+                existingMember.intendedTrialDate = new Date(memberData.intendedTrialDate);
             }
+            // Réactive un ancien membre, sans jamais rétrograder un membre inscrit/actif.
+            if (existingMember.status === 'inactif') {
+                existingMember.status = 'pré-inscrit';
+            }
+
+            await existingMember.save();
+            member = existingMember;
+        } else {
+            // Nouvelle pré-inscription
+            member = new Member({
+                ...memberData,
+                status: 'pré-inscrit',
+                // Les champs admin restent vides
+                registrationDate: undefined,
+                checkDeposits: [],
+            });
+            await member.save();
         }
 
-        // Notifier tous les managers de la nouvelle pré-inscription
+        // Photo (optionnelle) : en cas d'échec, la pré-inscription reste valide
+        await handleMemberPhoto(member, req.file, isRenewal);
+
+        // Notifier tous les managers (nouvelle pré-inscription ou renouvellement)
         try {
-            await notifyManagersOfNewPreRegistration(member);
+            await notifyManagersOfNewPreRegistration(member, isRenewal);
         } catch (notificationError) {
             console.error('❌ Erreur lors de la notification des managers:', notificationError);
             // On continue même si la notification échoue
         }
 
-        res.status(201).json({
+        res.status(isRenewal ? 200 : 201).json({
             success: true,
-            message:
-                'Inscription enregistrée avec succès ! Vous recevrez un email de confirmation.',
+            message: isRenewal
+                ? 'Votre pré-inscription a bien été mise à jour ! Vous recevrez un email de confirmation.'
+                : 'Inscription enregistrée avec succès ! Vous recevrez un email de confirmation.',
             data: {
                 id: member._id,
                 firstName: member.firstName,
@@ -211,9 +257,9 @@ export const getPublicStats = async (req: Request, res: Response) => {
 };
 
 /**
- * Notifier tous les managers d'une nouvelle pré-inscription
+ * Notifier tous les managers d'une nouvelle pré-inscription ou d'un renouvellement
  */
-async function notifyManagersOfNewPreRegistration(member: any) {
+async function notifyManagersOfNewPreRegistration(member: any, isRenewal = false) {
     try {
         // Récupérer tous les utilisateurs avec le rôle 'manager' ou 'admin'
         const managers = await User.find({
@@ -238,8 +284,11 @@ async function notifyManagersOfNewPreRegistration(member: any) {
         };
 
         // Créer le message de notification
-        const notificationTitle = 'Nouvelle pré-inscription';
-        const notificationMessage = `${member.firstName} ${member.lastName} s'est pré-inscrit(e)${
+        const notificationTitle = isRenewal
+            ? 'Renouvellement de pré-inscription'
+            : 'Nouvelle pré-inscription';
+        const action = isRenewal ? "s'est ré-inscrit(e)" : "s'est pré-inscrit(e)";
+        const notificationMessage = `${member.firstName} ${member.lastName} ${action}${
             member.city ? ` depuis ${member.city}` : ''
         }${
             member.intendedTrialDate
@@ -263,7 +312,9 @@ async function notifyManagersOfNewPreRegistration(member: any) {
                     metadata: {
                         memberId: member._id.toString(),
                         memberInfo: memberInfo,
-                        actionType: 'new_pre_registration',
+                        actionType: isRenewal
+                            ? 'pre_registration_renewal'
+                            : 'new_pre_registration',
                     },
                     actionUrl: `/members?view=${member._id.toString()}`,
                     actionText: 'Voir le profil',
